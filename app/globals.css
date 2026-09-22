@@ -4978,3 +4978,31 @@ footer .footerBrand img {
     transition-duration: .01ms !important;
   }
 }
+
+/* General readability: slightly larger supporting text, without changing h1/h2/h3 display titles. */
+.pageHero p,
+.sectionHead p,
+.courseLarge p,
+.profileTitle p,
+.profileCard p,
+.stepsGrid p,
+.picker p,
+.authArt p,
+.authForm > p,
+.resultBar,
+.place,
+.courseMeta {
+  font-size: 18px;
+}
+
+.filters select,
+.priceInput,
+.filterSearch input,
+.authForm input,
+.authForm label,
+.sideNav button,
+.pickerList strong,
+.cardActions .outline,
+.cardActions .button {
+  font-size: 16px;
+}
