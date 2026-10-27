@@ -5,7 +5,9 @@ test("new home story follows scrolling and the horizon opens into the final scen
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/");
   const story = page.locator(".scrollStory-possibilities");
-  await expect(story).toHaveClass(/isMotion/);
+  // Motion loads on the first interaction, as it does for a real visitor.
+  await page.mouse.wheel(0, 1);
+  await expect(story).toHaveClass(/isMotion/, { timeout: 20000 });
   await page.locator("#story-possibilities-2").scrollIntoViewIfNeeded();
   await expect(story.locator(".scrollStoryChapter[aria-current=step] h3")).toHaveText("Uma escolha com a sua cara.");
   await expect(story.locator(".scrollStoryVisualWord")).toHaveText("TRANSFORMAR");
@@ -26,7 +28,9 @@ test("new home story follows scrolling and the horizon opens into the final scen
 test("how it works has six readable chapters and a working next destination", async ({ page }) => {
   await page.goto("/como-funciona");
   const story = page.locator(".scrollStory-guide");
-  await expect(story).toHaveClass(/isMotion/);
+  // Motion loads on the first interaction, as it does for a real visitor.
+  await page.mouse.wheel(0, 1);
+  await expect(story).toHaveClass(/isMotion/, { timeout: 20000 });
   await expect(story.locator(".scrollStoryChapter")).toHaveCount(6);
   await page.locator("#story-guide-4").scrollIntoViewIfNeeded();
   await expect(story.locator(".scrollStoryChapter[aria-current=step] h3")).toHaveText("Organize");
