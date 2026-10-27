@@ -24,7 +24,7 @@ import type { Institution, Offer, UserProfile, CourseDetail } from "../lib/conte
 import { courseInfo, nav } from "../lib/content";
 import LegalPage, { type LegalView } from "./LegalPages";
 import { CinemaIcon } from "./cinema/CinemaIcon";
-import { illustrationFor } from "../lib/illustrations";
+import { assignIllustrations, illustrationFor } from "../lib/illustrations";
 import { courseArea } from "../lib/areas";
 import { legal, legalLinks } from "../lib/legal";
 import { clean, fieldError, guard } from "../lib/sanitize";
@@ -72,7 +72,7 @@ const placeholderImage = (name: string) => {
 // Free licenses (CC BY / CC BY-SA) require author, license and source next to the photo.
 function ImageCredit({ i }: { i: Institution }) {
   if (!i.image) {
-    const art = illustrationFor(i.id, i.type);
+    const art = i.illustration || illustrationFor(i.id, i.type);
     return (
       <p className="imageCredit">
         <b>Imagem ilustrativa</b>: não mostra {i.name}. Foto: {art.author} · {art.license}
@@ -96,7 +96,7 @@ function ImageCredit({ i }: { i: Institution }) {
 // Served through next/image: WebP at the size each slot needs instead of the 960px source.
 function InstitutionImage({ i, className, sizes = "(max-width: 700px) 92vw, 420px" }: { i: Institution; className?: string; sizes?: string }) {
   const [failed, setFailed] = useState(false);
-  const art = i.image ? null : illustrationFor(i.id, i.type);
+  const art = i.image ? null : i.illustration || illustrationFor(i.id, i.type);
   const src = i.image || art!.src;
   const alt = i.image ? `Foto de ${i.name}` : `Imagem ilustrativa: ${art!.alt}`;
   const title = i.image && i.imageCredit ? `Foto: ${i.imageCredit.author} · ${i.imageCredit.license}` : art ? `Imagem ilustrativa · ${art.author}` : undefined;
@@ -2160,7 +2160,7 @@ function Auth({
 
       onDone(u);
 
-      router.push("/perfil");
+      router.push("/instituicoes");
     } else {
       const { data, error } =
         await supabase.auth.signInWithPassword(
@@ -2203,7 +2203,7 @@ function Auth({
           null,
       });
 
-      router.push("/perfil");
+      router.push("/instituicoes");
     }
 
     setBusy(false);
@@ -2652,7 +2652,7 @@ export default function MatriculouApp({
 
       if (alive) {
         setCatalogStatus(is.error || os.error ? "error" : "ready");
-        setInstitutions(
+        const list: Institution[] =
           (is.data || []).map(
             (x: any) => ({
               id: x.id,
@@ -2676,8 +2676,10 @@ export default function MatriculouApp({
                   ? { author: x.foto_autor, license: x.foto_licenca || "", source: x.foto_fonte || "" }
                   : null,
             })
-          )
-        );
+          );
+        // Each institution without a photo gets an illustrative picture no other card uses.
+        const art = assignIllustrations(list);
+        setInstitutions(list.map((i) => (art.has(i.id) ? { ...i, illustration: art.get(i.id) } : i)));
 
         setOffers(
           (os.data || []).map(

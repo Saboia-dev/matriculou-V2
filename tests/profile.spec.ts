@@ -24,6 +24,9 @@ async function signIn(page: Page) {
   await page.getByLabel("E-mail").fill(user.email);
   await page.getByLabel("Senha").fill("senha-qualquer");
   await page.getByRole("button", { name: /Entrar na minha conta/ }).click();
+  // Signing in lands on the institutions catalog; the profile is one click away in the header.
+  await page.waitForURL("**/instituicoes");
+  await page.locator("a.userMini").click();
   await page.waitForURL("**/perfil");
 }
 

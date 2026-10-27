@@ -67,3 +67,16 @@ test("course search finds courses by area", async ({ page }) => {
   await page.getByLabel("Pesquisar curso").fill("xyzabc");
   await expect(page.getByText("Nenhum curso encontrado")).toBeVisible();
 });
+
+test("every institution card shows a different picture", async ({ page }) => {
+  await page.goto("/instituicoes");
+  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
+  // Cards render progressively; wait until the whole catalog is on the page.
+  const total = Number((await page.locator(".resultBar b").innerText()).match(/\d+/)![0]);
+  await expect(page.locator(".cards3 > .instCard")).toHaveCount(total, { timeout: 20000 });
+  const sources = await page.locator(".cards3 > .instCard .instImage img").evaluateAll((imgs) =>
+    imgs.map((img) => decodeURIComponent((img as HTMLImageElement).currentSrc || (img as HTMLImageElement).src).replace(/.*url=([^&]+).*/, "$1")),
+  );
+  expect(sources.length).toBe(total);
+  expect(sources.filter((src, index) => sources.indexOf(src) !== index)).toEqual([]);
+});

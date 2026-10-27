@@ -108,7 +108,7 @@ As fotos foram recortadas e redimensionadas (960 × 640). Cada versão adaptada 
 
 ## Imagens ilustrativas
 
-Instituições sem foto própria com licença livre mostram uma imagem ilustrativa de um ambiente de ensino, escolhida pelo tipo da instituição (`lib/illustrations.ts`). O cartão traz o selo “Imagem ilustrativa” e os detalhes informam que a imagem não mostra a instituição. Arquivos em `public/images/ilustrativas`, recortados para 960 × 640 e distribuídos sob a mesma licença do original. Também são usadas `classroom.jpg`, `students.jpg` e `library.jpg` do Pexels.
+Instituições sem foto própria com licença livre mostram uma imagem ilustrativa de um ambiente de ensino, escolhida pelo tipo da instituição (`lib/illustrations.ts`). Cada instituição recebe uma imagem exclusiva: nenhuma ilustração se repete no catálogo enquanto houver imagens livres no acervo. O cartão traz o selo “Imagem ilustrativa” e os detalhes informam que a imagem não mostra a instituição. Arquivos em `public/images/ilustrativas`, recortados para 960 × 640 e distribuídos sob a mesma licença do original. As fotos do Pexels (`classroom.jpg`, `students.jpg`, `library.jpg` etc.) ficam só nas seções do site e não são usadas como ilustração de instituição.
 
 | Arquivo | Autor | Licença | Fonte |
 |---|---|---|---|
@@ -120,3 +120,23 @@ Instituições sem foto própria com licença livre mostram uma imagem ilustrati
 | `universidade-5.jpg` | Universidade de Brasília | CC BY 2.0 | [CIC Est…](https://commons.wikimedia.org/wiki/File:CIC_Est_-_Departamentos_de_Ci%C3%AAncia_da_Computa%C3%A7%C3%A3o_e_Estat%C3%ADstica._(29764879028).jpg) |
 | `faculdade-1.jpg` | Yinan Chen | Domínio público | [Gfp-lecture-hall.jpg](https://commons.wikimedia.org/wiki/File:Gfp-lecture-hall.jpg) |
 | `faculdade-2.jpg` | TAGU | CC BY-SA 4.0 | [Estantes - Biblioteca de Veterinarias.JPG](https://commons.wikimedia.org/wiki/File:Estantes_-_Biblioteca_de_Veterinarias.JPG) |
+| `tecnico-12.jpg` | ProjectManhattan | CC BY-SA 3.0 | [Computer lab 2.jpg](https://commons.wikimedia.org/wiki/File:Computer_lab_2.jpg) |
+| `tecnico-13.jpg` | Mbrickn | CC BY-SA 4.0 | [Center for Advanced Visualization and Education.jpg](https://commons.wikimedia.org/wiki/File:Center_for_Advanced_Visualization_and_Education.jpg) |
+| `tecnico-14.jpg` | Yusongc | CC BY-SA 4.0 | [Computer Lab Picture.jpg](https://commons.wikimedia.org/wiki/File:Computer_Lab_Picture.jpg) |
+| `tecnico-15.jpg` | DFW FAA Brianvators | CC BY-SA 4.0 | [Computers.jpg](https://commons.wikimedia.org/wiki/File:Computers.jpg) |
+| `tecnico-16.jpg` | JackFromWisconsin | CC0 (domínio público) | [Computer Lab Baraboo.jpg](https://commons.wikimedia.org/wiki/File:Computer_Lab_Baraboo.jpg) |
+| `tecnico-17.jpg` | ManoBV16 | CC0 (domínio público) | [AI Lab 1.jpg](https://commons.wikimedia.org/wiki/File:AI_Lab_1.jpg) |
+| `tecnico-18.jpg` | JesusRamirez | CC BY 3.0 | [Combo Equipos.jpg](https://commons.wikimedia.org/wiki/File:Combo_Equipos.jpg) |
+| `escola-2.jpg` | JúlioJpc | CC0 (domínio público) | [IMGSala de Aula.jpg](https://commons.wikimedia.org/wiki/File:IMGSala_de_Aula.jpg) |
+| `escola-3.jpg` | Ámonbaal | CC0 (domínio público) | [Sala de aula escola Ferreira Mendes.jpg](https://commons.wikimedia.org/wiki/File:Sala_de_aula_escola_Ferreira_Mendes.jpg) |
+| `escola-4.jpg` | Juliana matos86 | CC BY-SA 4.0 | [Biblioteca maristaRosario.jpg](https://commons.wikimedia.org/wiki/File:Biblioteca_maristaRosario.jpg) |
+| `escola-5.jpg` | Nyxh Filippovna | CC BY-SA 4.0 | [LIBRIS - Biblioteca Modelo 1.jpg](https://commons.wikimedia.org/wiki/File:LIBRIS_-_Biblioteca_Modelo_1.jpg) |
+| `escola-6.jpg` | Isabel Sacco | CC BY-SA 4.0 | [Biblioteca U3 Cambridge (8).jpg](https://commons.wikimedia.org/wiki/File:Biblioteca_U3_Cambridge_(8).jpg) |
+| `faculdade-4.jpg` | Derzsi Elekes Andor | CC BY-SA 3.0 | [Budapesti Corvinus Egyetem - 2014.06.12 (20).JPG](https://commons.wikimedia.org/wiki/File:Budapesti_Corvinus_Egyetem_-_2014.06.12_(20).JPG) |
+| `faculdade-5.jpg` | Globetrotter19 | CC BY-SA 3.0 | ['Gólyavár' Gebäude, Hörsaal Pázmány, 2022 Józsefváros.jpg](https://commons.wikimedia.org/wiki/File:%27G%C3%B3lyav%C3%A1r%27_Geb%C3%A4ude,_H%C3%B6rsaal_P%C3%A1zm%C3%A1ny,_2022_J%C3%B3zsefv%C3%A1ros.jpg) |
+| `universidade-6.jpg` | Marina Macambyra | CC BY-SA 4.0 | [Biblioteca da ECA vista geral 01.jpg](https://commons.wikimedia.org/wiki/File:Biblioteca_da_ECA_vista_geral_01.jpg) |
+| `universidade-7.jpg` | Marina Macambyra | CC BY-SA 4.0 | [Biblioteca da ECA vista parcial 01.jpg](https://commons.wikimedia.org/wiki/File:Biblioteca_da_ECA_vista_parcial_01.jpg) |
+| `universidade-8.jpg` | Raquel da Silva Santos | CC BY-SA 4.0 | [Biblioteca CJA 2020.jpg](https://commons.wikimedia.org/wiki/File:Biblioteca_CJA_2020.jpg) |
+| `universidade-9.jpg` | Roger de Miranda Guedes | CC BY-SA 4.0 | [Interior da Biblioteca de São Paulo - SP.jpg](https://commons.wikimedia.org/wiki/File:Interior_da_Biblioteca_de_S%C3%A3o_Paulo_-_SP.jpg) |
+| `universidade-10.jpg` | ארז האורז | CC BY-SA 4.0 | [Chase hall.jpg](https://commons.wikimedia.org/wiki/File:Chase_hall.jpg) |
+| `universidade-11.jpg` | Mike Peel | CC BY-SA 4.0 | [At Chicago 2024 067.jpg](https://commons.wikimedia.org/wiki/File:At_Chicago_2024_067.jpg) |
