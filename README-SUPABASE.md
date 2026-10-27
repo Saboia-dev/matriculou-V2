@@ -8,6 +8,7 @@ Projeto Next.js do Matriculou conectado ao Supabase.
 2. O arquivo `.env.local` já contém a URL e a chave pública do projeto Supabase usado pelo projeto.
 3. No SQL Editor do Supabase, execute `supabase/setup.sql`.
 4. Depois execute `supabase/seed_47_instituicoes.sql` para carregar as 47 instituições e suas ofertas.
+5. Em seguida, execute `supabase/lgpd-conformidade.sql`, `supabase/instituicoes-fotos-e-ampliacao.sql` e, por último, `supabase/correcao-dados-catalogo.sql` (corrige conceitos MEC atribuídos a escolas e nomes de curso duplicados).
 
 ## Storage
 

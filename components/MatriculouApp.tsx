@@ -9,6 +9,7 @@ import ScrollStory from "./cinema/ScrollStory";
 import NextChapter from "./cinema/NextChapter";
 import { demoInstitutions, demoOffers } from "../lib/demo-content";
 import { normalize } from "../lib/chat";
+import { matchesQuery, stateNames } from "../lib/search";
 import {
   useEffect,
   useMemo,
@@ -127,7 +128,12 @@ const priceLabel = (i: Institution, suffix = "/mês") =>
 const typeLabels: Record<string, string> = { universidade: "Universidade", faculdade: "Faculdade", tecnico: "Técnico", escola: "Escola", instituto: "Instituto", "centro universitário": "Centro universitário" };
 const typeLabel = (type: string) => typeLabels[type] || (type ? type[0].toUpperCase() + type.slice(1) : "Não informado");
 
-const mecLabel = (i: Institution) => (i.mec ? String(i.mec) : "Não informado");
+// The MEC concept (CI/IGC) only exists for higher-education institutions, never for schools.
+const mecLabel = (i: Institution) => (i.type === "escola" ? "Não se aplica (educação básica)" : i.mec ? String(i.mec) : "Não informado");
+
+// The same course spelled differently in the database is shown as a single course.
+const courseAliases: Record<string, string> = { "engenharia da computacao": "Engenharia de Computação" };
+const canonicalCourse = (name: string) => courseAliases[normalize(name.trim())] || name.trim();
 
 function DataNotice() {
   return (
@@ -501,6 +507,7 @@ function InstitutionsView({
   onLike,
   onCompare,
   onOpen,
+  loading,
 }: {
   institutions: Institution[];
   offers: Offer[];
@@ -508,6 +515,7 @@ function InstitutionsView({
   onLike: (id: string) => void;
   onCompare: (id: string) => void;
   onOpen: (i: Institution) => void;
+  loading: boolean;
 }) {
   const [q, setQ] = useState("");
 
@@ -528,16 +536,29 @@ function InstitutionsView({
     ...new Set(institutions.map((i) => i.state).filter(Boolean)),
   ].sort();
 
+  // Name, city, state (abbreviation and full name), type, network and courses offered.
+  const searchText = useMemo(() => {
+    const courses = new Map<string, string[]>();
+    for (const o of offers) {
+      if (!o.course_name) continue;
+      if (!courses.has(o.institution_id)) courses.set(o.institution_id, []);
+      courses.get(o.institution_id)!.push(o.course_name);
+    }
+    return new Map(institutions.map((i) => [
+      i.id,
+      [i.name, i.city, i.state, stateNames[i.state] || "", typeLabel(i.type), i.network === "publica" ? "pública" : "privada", ...(courses.get(i.id) || [])].join(" "),
+    ]));
+  }, [institutions, offers]);
+
   const filtered = institutions
-    .filter((i) =>
-      normalize(`${i.name} ${i.city} ${i.state}`).includes(normalize(q))
-    )
+    .filter((i) => matchesQuery(searchText.get(i.id) || i.name, q))
     .filter(
       (i) => network === "todas" || i.network === network
     )
     .filter((i) => type === "todos" || i.type === type)
     .filter((i) => state === "todos" || i.state === state)
-    .filter((i) => !max || i.price <= Number(max))
+    // Private institutions without a published fee are left out: the price is unknown, not zero.
+    .filter((i) => !max || (i.network === "publica" ? i.price <= Number(max) : i.price > 0 && i.price <= Number(max)))
     .filter(
       (i) =>
         mode === "todos" ||
@@ -619,7 +640,8 @@ function InstitutionsView({
                 value={q}
                 maxLength={120}
                 onChange={guard("text", setQ)}
-                placeholder="Instituição, cidade ou estado"
+                placeholder="Instituição, cidade, estado ou curso"
+                aria-label="Pesquisar instituição, cidade, estado ou curso"
               />
             </label>
 
@@ -665,8 +687,11 @@ function InstitutionsView({
                 <input
                   type="number"
                   min="0"
+                  step="50"
+                  inputMode="numeric"
+                  aria-label="Mensalidade máxima em reais"
                   value={max}
-                  onChange={(e) => setMax(e.target.value)}
+                  onChange={(e) => setMax(e.target.value.replace(/^-/, ""))}
                   placeholder="Sem limite"
                 />
               </div>
@@ -685,8 +710,10 @@ function InstitutionsView({
         </div>
 
         <div className="resultBar">
-          <div><b>{filtered.length} instituições</b><span>Resultados encontrados</span></div>
-          <span>Favoritos ficam salvos no seu perfil.</span>
+          {loading
+            ? <div><b>Carregando instituições…</b><span>Buscando o catálogo</span></div>
+            : <div><b>{filtered.length} {filtered.length === 1 ? "instituição" : "instituições"}</b><span>{filtered.length === 1 ? "Resultado encontrado" : "Resultados encontrados"}</span></div>}
+          <span>{max ? "Com valor máximo, entram as públicas e as privadas com mensalidade informada." : "Favoritos ficam salvos no seu perfil."}</span>
         </div>
 
         <div className="cards3">
@@ -702,9 +729,9 @@ function InstitutionsView({
           ))}
         </div>
 
-        {!filtered.length && (
+        {!filtered.length && !loading && (
           <div className="emptySmall">
-            Nenhuma instituição encontrada com esses filtros.
+            Nenhuma instituição encontrada com esses filtros. Tente outra palavra ou clique em “Limpar filtros”.
           </div>
         )}
       </section>
@@ -1010,9 +1037,10 @@ function CoursesView({
     : courseInfo.map((c) => c.name);
 
   const filtered = data
-    .filter((n) =>
-      normalize(n).includes(normalize(q))
-    )
+    .filter((n) => {
+      const d = getCourseDetail(n);
+      return matchesQuery(`${n} ${d.area} ${d.level}`, q);
+    })
     .filter(
       (n) =>
         activeArea === "Todas" ||
@@ -1199,6 +1227,12 @@ function CoursesView({
               );
             })}
           </div>
+
+          {!filtered.length && (
+            <div className="emptySmall">
+              Nenhum curso encontrado. Tente outra palavra ou escolha “Todas” as áreas.
+            </div>
+          )}
         </section>
       ) : (
         <CourseCompareTable
@@ -1309,11 +1343,13 @@ function Compare({ institutions }: { institutions: Institution[] }) {
   const [ids, setIds] = useState<string[]>([]);
   const [modal, setModal] = useState(false);
   const [type, setType] = useState("todos");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("matriculou-compare");
-      if (raw) setIds(JSON.parse(raw));
+      const saved = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(saved)) setIds(saved.filter((x) => typeof x === "string").slice(0, 4));
     } catch {}
   }, []);
 
@@ -1324,16 +1360,22 @@ function Compare({ institutions }: { institutions: Institution[] }) {
 
   const remove = (id: string) => persist(ids.filter((x) => x !== id));
 
-  const add = (id: string) => {
-    if (ids.includes(id)) return;
-    if (ids.length >= 4) return;
-    persist([...ids, id]);
-    setModal(false);
-  };
-
   const selected = ids.map((id) => institutions.find((i) => i.id === id)).filter(Boolean) as Institution[];
+
+  // Counts only institutions that still exist in the catalog, so a stale id never blocks a slot.
+  const add = (id: string) => {
+    if (ids.includes(id) || selected.length >= 4) return;
+    persist([...selected.map((i) => i.id), id]);
+    setModal(false);
+    setSearch("");
+  };
   const types = [...new Set(institutions.map((i) => i.type).filter(Boolean))].sort();
-  const options = institutions.filter((i) => (type === "todos" || i.type === type) && !ids.includes(i.id));
+  const full = selected.length >= 4;
+  const options = institutions.filter((i) =>
+    (type === "todos" || i.type === type) &&
+    !ids.includes(i.id) &&
+    matchesQuery(`${i.name} ${i.city} ${i.state} ${stateNames[i.state] || ""}`, search)
+  );
 
   return (
     <main className="page" id="conteudo">
@@ -1386,17 +1428,31 @@ function Compare({ institutions }: { institutions: Institution[] }) {
       {modal && <ComparePicker onClose={() => setModal(false)}>
             <span className="eyebrow">Adicionar ao comparador</span>
             <h2 id="compare-picker-title">Escolha suas instituições.</h2>
-            <p>Filtre por tipo e selecione até quatro opções para comparar.</p>
+            <p>
+              {full
+                ? "Você já escolheu quatro instituições. Remova uma da comparação para adicionar outra."
+                : `Pesquise, filtre por tipo e selecione até quatro opções (${selected.length}/4).`}
+            </p>
+            <label className="filterSearch pickerSearch">
+              <Icon n="search" s={20} />
+              <input
+                value={search}
+                maxLength={120}
+                onChange={guard("text", setSearch)}
+                placeholder="Instituição, cidade ou estado"
+                aria-label="Pesquisar instituição para comparar"
+              />
+            </label>
             <div className="pickerTypes">
               <button className={type === "todos" ? "active" : ""} onClick={() => setType("todos")}>Todas</button>
               {types.map((t) => <button className={type === t ? "active" : ""} key={t} onClick={() => setType(t)}>{typeLabel(t)}</button>)}
             </div>
             <div className="pickerList">
               {options.map((i) => (
-                <button key={i.id} onClick={() => add(i.id)}>
+                <button key={i.id} onClick={() => add(i.id)} disabled={full}>
                   <InstitutionImage i={i} sizes="96px" />
                   <span><b>{i.name}</b><small>{i.city}, {i.state} · {i.network === "publica" ? "Pública" : "Privada"}</small></span>
-                  <strong>Adicionar</strong>
+                  <strong>{full ? "Limite atingido" : "Adicionar"}</strong>
                 </button>
               ))}
               {!options.length && <div className="emptySmall">Não há outras instituições disponíveis com este filtro.</div>}
@@ -2630,7 +2686,7 @@ export default function MatriculouApp({
               institution_id:
                 x.instituicao_id,
               course_name:
-                x.curso_nome,
+                x.curso_nome ? canonicalCourse(x.curso_nome) : x.curso_nome,
               level: x.nivel,
               modality:
                 x.modalidade,
@@ -2677,10 +2733,12 @@ export default function MatriculouApp({
     };
   }, []);
 
+  // A new message restarts the timer, so it is not cut short by the previous one.
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>();
   const show = (s: string) => {
     setToast(s);
-
-    setTimeout(
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(
       () => setToast(""),
       3000
     );
@@ -2834,6 +2892,7 @@ export default function MatriculouApp({
           onLike={toggleLike}
           onCompare={addCompare}
           onOpen={setModal}
+          loading={catalogStatus === "loading"}
         />
       );
       break;

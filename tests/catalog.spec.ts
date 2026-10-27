@@ -32,3 +32,38 @@ test("institution cards stay fully visible through filters and scrolling", async
   await toList();
   expect(await fadedCards(page)).toBe(0);
 });
+
+test("institution search matches courses, full state names and words in any order", async ({ page }) => {
+  await page.goto("/instituicoes");
+  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
+  const search = page.locator(".filterSearch input");
+  const titles = () => page.locator(".cards3 > .instCard h3").allInnerTexts();
+
+  await search.fill("rio ufrj");
+  expect(await titles()).toContain("Universidade Federal do Rio de Janeiro (UFRJ)");
+
+  await search.fill("minas gerais");
+  expect((await titles()).length).toBeGreaterThan(0);
+  await expect(page.locator(".cards3 > .instCard .place").first()).toContainText("MG");
+
+  await search.fill("medicina veterinaria");
+  expect((await titles()).length).toBeGreaterThan(0);
+
+  await search.fill("sp");
+  for (const place of await page.locator(".cards3 > .instCard .place").allTextContents()) expect(place).toContain("SP");
+});
+
+test("schools never show a MEC concept", async ({ page }) => {
+  await page.goto("/instituicoes");
+  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
+  await page.getByLabel("Tipo de instituição").selectOption("escola");
+  for (const rating of await page.locator(".cards3 > .instCard .rating").allTextContents()) expect(rating).toContain("Não se aplica");
+});
+
+test("course search finds courses by area", async ({ page }) => {
+  await page.goto("/cursos");
+  await page.getByLabel("Pesquisar curso").fill("saude");
+  await expect(page.locator(".courseLarge h2", { hasText: "Enfermagem" })).toBeVisible();
+  await page.getByLabel("Pesquisar curso").fill("xyzabc");
+  await expect(page.getByText("Nenhum curso encontrado")).toBeVisible();
+});

@@ -115,3 +115,9 @@ html, body { overflow-x: clip; }
 /* Reading rhythm: running text sits at 1.6 (the 1.5–1.6 band reads best at these sizes). */
 .cinematicHome p, .miaMessage p, .missingContent > p, .routeCinemaHero .routeCinemaCopy p, .scrollStoryChapter p,
 .nextChapter p, .cinemaPortalCopy p, .legalBody p, .legalBody li, .authForm > p, .accountCard p { line-height: 1.6; }
+
+/* Search inside the comparison picker: one line, same field language as the catalog filters. */
+.pickerSearch { min-height: 52px; grid-template-rows: auto; margin: 14px 0 12px; }
+.pickerSearch .ico { grid-row: auto; }
+.pickerSearch input, .pickerSearch input:focus, .pickerSearch input:focus-visible { border: 0; outline: 0; box-shadow: none; background: transparent; padding: 0; }
+.pickerList button:disabled { cursor: not-allowed; opacity: .55; }

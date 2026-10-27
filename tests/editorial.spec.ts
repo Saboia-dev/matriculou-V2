@@ -14,7 +14,7 @@ test('Mia filters the catalog, follows up on a city, persists and resets the con
   await page.getByLabel('Sua mensagem', { exact: true }).fill('São Paulo');
   await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click();
   await page.getByRole('link', { name: 'Buscar em São Paulo', exact: true }).click();
-  await expect(page.getByPlaceholder('Instituição, cidade ou estado')).toHaveValue('São Paulo');
+  await expect(page.getByPlaceholder('Instituição, cidade, estado ou curso')).toHaveValue('São Paulo');
   await expect(page.getByLabel('Rede', { exact: true })).toHaveValue('todas');
   await page.reload();
   await page.getByRole('button', { name: 'Abrir assistente', exact: true }).click();
@@ -53,5 +53,5 @@ test('custom 404 preserves HTTP status and provides working recovery search on m
   await page.getByLabel('Buscar uma instituição ou cidade').fill('Curitiba');
   await page.locator('.missingSearch').getByRole('button', { name: 'Buscar instituições', exact: true }).click();
   await expect(page).toHaveURL(/instituicoes\?q=Curitiba/);
-  await expect(page.getByPlaceholder('Instituição, cidade ou estado')).toHaveValue('Curitiba');
+  await expect(page.getByPlaceholder('Instituição, cidade, estado ou curso')).toHaveValue('Curitiba');
 });

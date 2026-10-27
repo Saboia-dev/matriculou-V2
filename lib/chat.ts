@@ -11,8 +11,9 @@ export function chatReply(input: string, awaitingCity = false): { message: ChatM
   if (/perto|proxim[oa]|bairro|cidade|localiza/.test(q) && !awaitingCity) return make('Em qual cidade você quer estudar? Digite o nome e eu abro a busca para você. Você também pode combinar cidade e estado, como “São Paulo SP”.', undefined, undefined, true);
   if (/\bpublicas?\b|gratuit|sem mensalidade/.test(q)) return make('Vamos começar pelas instituições públicas. O catálogo já vai abrir com o filtro de rede aplicado; você pode refinar por localização e modalidade.', '/instituicoes?rede=publica', 'Explorar instituições públicas');
   if (/privad|particular/.test(q)) return make('Encontre instituições privadas e compare o investimento. Você pode ajustar o valor máximo na busca.', '/instituicoes?rede=privada', 'Explorar instituições privadas');
-  if (/ead|distancia|online/.test(q)) return make('Estudar de onde você estiver também é um caminho. Separei o filtro EAD para você explorar as instituições com ofertas nessa modalidade.', '/instituicoes?modalidade=ead', 'Encontrar opções EAD');
-  const course = courseInfo.find(c => q.includes(normalize(c.name)));
+  if (/\bead\b|distancia|online/.test(q)) return make('Estudar de onde você estiver também é um caminho. Separei o filtro EAD para você explorar as instituições com ofertas nessa modalidade.', '/instituicoes?modalidade=ead', 'Encontrar opções EAD');
+  // Longest names first, so "medicina veterinaria" is not answered as "medicina".
+  const course = [...courseInfo].sort((a, b) => b.name.length - a.name.length).find(c => q.includes(normalize(c.name)));
   if (course) return make(`${course.name}: ${course.desc} A duração de referência é ${course.duration}. Você pode conhecer as disciplinas e comparar com outros cursos no catálogo. A oferta varia por instituição.`, `/cursos?q=${encodeURIComponent(course.name)}`, `Conhecer ${course.name}`);
   const area = [...new Set(courseInfo.map(c => c.area))].find(a => q.includes(normalize(a)));
   if (area) return make(`Vamos explorar ${area.toLowerCase()}? Reuni os cursos dessa área para você conhecer a formação, as disciplinas e os caminhos profissionais.`, `/cursos?area=${encodeURIComponent(area)}`, `Ver cursos de ${area}`);
