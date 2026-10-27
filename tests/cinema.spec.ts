@@ -10,7 +10,7 @@ test("carousel changes image and copy, supports manual controls and pauses", asy
   await expect(page.locator(".filmTitle")).toContainText("vai além");
   await expect(page.locator(".filmFrame.isActive")).toHaveClass(/campus/);
   await page.getByRole("button", { name: "Pausar carrossel", exact: true }).click();
-  await page.locator(".filmHeroTop").click();
+  await page.locator(".filmDescription").click();
   await expect(page.locator(".filmHero")).toHaveAttribute("data-running", "false");
   await page.waitForTimeout(6200);
   await expect(page.locator(".filmSceneCount b")).toHaveText("02");
@@ -59,10 +59,10 @@ test("motion control persists across routes and restores visible content", async
   await expect(page.getByRole("heading", { name: "Entenda antes de escolher." })).toBeVisible();
 });
 
-test("mobile and reduced motion preserve the layout and all story chapters", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
+test("mobile and reduced motion preserve the layout and all story chapters", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = await context.newPage();
-  await page.goto("http://localhost:3000");
+  await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-cinema", "off");
   await expect(page.locator(".filmJourney")).not.toHaveClass(/isEnhanced/);
   await expect(page.locator(".filmJourneyScene")).toHaveCount(3);

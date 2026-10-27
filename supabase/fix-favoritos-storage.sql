@@ -28,7 +28,6 @@ with check (auth.uid() = user_id);
 
 -- Permissões necessárias para o cliente Supabase consultar a tabela.
 grant select, insert, update, delete on public.favoritos to authenticated;
-grant select on public.favoritos to anon;
 
 -- =========================================================
 -- STORAGE: AVATARES
@@ -53,12 +52,12 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values (
   'pre-matriculas',
   'pre-matriculas',
-  true,
+  false,
   10485760,
   array['application/pdf','image/png','image/jpeg','image/webp']::text[]
 )
 on conflict (id) do update
-set public = true,
+set public = false,
     file_size_limit = 10485760,
     allowed_mime_types = array['application/pdf','image/png','image/jpeg','image/webp']::text[];
 

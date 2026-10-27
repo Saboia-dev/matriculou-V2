@@ -123,8 +123,8 @@ values ('avatars','avatars',true,2097152,array['image/png','image/jpeg','image/w
 on conflict (id) do update set public=true,file_size_limit=2097152,allowed_mime_types=array['image/png','image/jpeg','image/webp']::text[];
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('pre-matriculas','pre-matriculas',true,10485760,array['application/pdf','image/png','image/jpeg','image/webp']::text[])
-on conflict (id) do update set public=true,file_size_limit=10485760,allowed_mime_types=array['application/pdf','image/png','image/jpeg','image/webp']::text[];
+values ('pre-matriculas','pre-matriculas',false,10485760,array['application/pdf','image/png','image/jpeg','image/webp']::text[])
+on conflict (id) do update set public=false,file_size_limit=10485760,allowed_mime_types=array['application/pdf','image/png','image/jpeg','image/webp']::text[];
 
 drop policy if exists "Avatar upload próprio" on storage.objects;
 create policy "Avatar upload próprio" on storage.objects for insert to authenticated with check (bucket_id='avatars' and (storage.foldername(name))[1]=auth.uid()::text);

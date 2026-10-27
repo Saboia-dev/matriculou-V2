@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { loadMotion, scheduleRefresh } from "./loadMotion";
 import { usePathname } from "next/navigation";
 
 type CinemaSettings = { enabled: boolean; paused: boolean; reduced: boolean; lite: boolean; toggle: () => void };
@@ -46,30 +47,43 @@ export default function CinemaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false, teardown = () => {};
-    Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(([{ gsap }, { ScrollTrigger }]) => {
+    loadMotion().then(([{ gsap }, { ScrollTrigger }]) => {
       if (cancelled) return;
       gsap.registerPlugin(ScrollTrigger);
       const disposers: (() => void)[] = [];
       const seen = new WeakSet<Element>();
       const context = gsap.context(() => {});
+      // Reveals use IntersectionObserver rather than ScrollTrigger: filters and late data
+      // move cards around, and precomputed trigger positions then left cards stuck faded.
+      const show = (element: HTMLElement) => {
+        reveal.unobserve(element);
+        element.dataset.reveal = "in";
+        setTimeout(() => { if (element.dataset.reveal === "in") delete element.dataset.reveal; }, 1300);
+      };
+      const reveal = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { if (entry.isIntersecting) show(entry.target as HTMLElement); });
+      }, { rootMargin: "0px 0px -6% 0px" });
+      const focusReveal = (e: FocusEvent) => {
+        const pending = (e.target as Element | null)?.closest<HTMLElement>("[data-reveal=pending]");
+        if (pending) show(pending);
+      };
+      document.addEventListener("focusin", focusReveal);
       const discover = () => {
-        const nodes = document.querySelectorAll<HTMLElement>("[data-cinema-reveal], .pageTransition .sectionHead, .pageTransition .courseLarge, .pageTransition .cards3>.instCard, .pageTransition .profileCard, .pageTransition .stepsGrid>article, .pageTransition .simpleGrid>article, .pageTransition .bijkStory, .pageTransition .compareSlot, .pageTransition .compareHint, .pageTransition .resultBar, footer>div");
+        // Search results (institution and course cards) are never faded in: they must be
+        // readable the moment a filter changes.
+        const nodes = document.querySelectorAll<HTMLElement>("[data-cinema-reveal], .pageTransition .sectionHead, .pageTransition .profileCard, .pageTransition .stepsGrid>article, .pageTransition .simpleGrid>article, .pageTransition .bijkStory, .pageTransition .compareSlot, .pageTransition .compareHint, .pageTransition .resultBar, footer>div");
         nodes.forEach((element, index) => {
           if (seen.has(element) || element.closest(".filmJourney") || element.getBoundingClientRect().height === 0) return;
           seen.add(element);
           // Never hide elements that are already visible or focused.
           if (element.getBoundingClientRect().top < innerHeight * .9 || element.contains(document.activeElement)) return;
-          context.add(() => {
-            gsap.fromTo(element, { opacity: .16, y: lite ? 18 : 45 }, {
-              opacity: 1, y: 0, duration: .95, delay: Math.min(index % 3 * .065, .13), ease: "power3.out", clearProps: "transform,opacity",
-              scrollTrigger: { trigger: element, start: "top 94%", once: true },
-            });
-          });
+          element.style.setProperty("--reveal-delay", `${Math.min(index % 3 * .065, .13)}s`);
+          element.dataset.reveal = "pending";
+          reveal.observe(element);
         });
       };
       context.add(() => {
-        const intro = document.querySelectorAll<HTMLElement>(".pageTransition .simpleHero>*,.pageTransition .aboutIntro>div:first-child>*,.pageTransition .authArt h1,.pageTransition .authArt p");
-        if (intro.length) gsap.fromTo(intro, { opacity: 0, y: lite ? 10 : 25 }, { opacity: 1, y: 0, duration: .9, stagger: .09, ease: "power3.out", clearProps: "transform,opacity" });
+        // Page intros are CSS animations (polish.css): they run before GSAP loads and never hide text.
         const logo = document.querySelector<HTMLElement>(".aboutLogoCard");
         if (logo && !lite) gsap.fromTo(logo, { rotate: -3, y: 10 }, { rotate: 3, y: -25, ease: "none", scrollTrigger: { trigger: logo.parentElement, start: "top 15%", end: "bottom top", scrub: .8 } });
         const finalOrbit = document.querySelector<HTMLElement>(".filmFinaleOrbit");
@@ -80,7 +94,7 @@ export default function CinemaProvider({ children }: { children: ReactNode }) {
       const observer = new MutationObserver(records => {
         if (!records.some(r => r.addedNodes.length)) return;
         cancelAnimationFrame(mutationFrame);
-        mutationFrame = requestAnimationFrame(() => { discover(); ScrollTrigger.refresh(); });
+        mutationFrame = requestAnimationFrame(() => { discover(); scheduleRefresh(ScrollTrigger); });
       });
       observer.observe(document.querySelector(".pageTransition") || document.body, { childList: true, subtree: true });
       if (!lite && matchMedia("(hover: hover) and (pointer: fine)").matches) {
@@ -106,7 +120,11 @@ export default function CinemaProvider({ children }: { children: ReactNode }) {
       const refresh = () => ScrollTrigger.refresh();
       document.fonts.ready.then(() => { if (!cancelled) refresh(); });
       window.addEventListener("load", refresh);
-      teardown = () => { observer.disconnect(); cancelAnimationFrame(mutationFrame); disposers.forEach(fn => fn()); context.revert(); window.removeEventListener("load", refresh); };
+      teardown = () => {
+        observer.disconnect(); reveal.disconnect(); document.removeEventListener("focusin", focusReveal);
+        document.querySelectorAll<HTMLElement>("[data-reveal]").forEach(element => { delete element.dataset.reveal; });
+        cancelAnimationFrame(mutationFrame); disposers.forEach(fn => fn()); context.revert(); window.removeEventListener("load", refresh);
+      };
     }).catch(() => { /* The static experience remains fully usable. */ });
     return () => { cancelled = true; teardown(); };
   }, [enabled, lite, pathname]);

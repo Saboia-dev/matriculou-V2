@@ -1,4 +1,4 @@
-export type Institution = { id:string; name:string; city:string; state:string; network:string; type:string; mec:number; price:number; scholarships:boolean; rating:number; reviews:number; image:string; vacancy:string; };
+export type Institution = { id:string; name:string; city:string; state:string; network:string; type:string; mec:number; price:number; scholarships:boolean; image:string|null; imageCredit?: { author:string; license:string; source:string } | null; };
 export type Offer = {id:string; institution_id:string; course_name:string; level:string; modality:string; shift:string; period:string};
 export type UserProfile = {id:string; email:string; name:string; avatar_url:string|null};
 export const nav=[{href:'/instituicoes',label:'Instituições'},{href:'/cursos',label:'Cursos'},{href:'/comparar',label:'Comparar'},{href:'/como-funciona',label:'Como funciona'},{href:'/sobre',label:'Sobre'}];

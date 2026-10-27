@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { chatReply, welcome, type ChatMessage } from '../lib/chat';
 import { CinemaIcon } from './cinema/CinemaIcon';
+import { clean, guard } from '../lib/sanitize';
 
 const storageKey = 'matriculou-mia-v1';
 const suggestions = ['Descobrir cursos', 'Instituições públicas', 'Estudar perto de mim', 'Comparar opções'];
@@ -25,7 +26,7 @@ export default function HelpChat() {
     try {
       const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
       if (Array.isArray(saved?.messages)) {
-        const valid = saved.messages.filter((m: ChatMessage) => typeof m.id === 'string' && ['bot', 'user'].includes(m.from) && typeof m.text === 'string' && (!m.href || /^\/(instituicoes|cursos|comparar|perfil|como-funciona)(\?|$)/.test(m.href))).slice(-60);
+        const valid = saved.messages.filter((m: ChatMessage) => typeof m.id === 'string' && ['bot', 'user'].includes(m.from) && typeof m.text === 'string' && (!m.href || /^\/(instituicoes|cursos|comparar|perfil|como-funciona|privacidade|lgpd|cookies)(\?|$)/.test(m.href))).slice(-60);
         if (valid.length) setMessages(valid);
         setAwaitingCity(saved.awaitingCity === true);
       }
@@ -69,7 +70,7 @@ export default function HelpChat() {
       input.current?.focus({ preventScroll: true });
     }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 550);
   };
-  const submit = (e: FormEvent) => { e.preventDefault(); send(draft); };
+  const submit = (e: FormEvent) => { e.preventDefault(); send(clean(draft)); };
   const reset = () => {
     clearTimeout(timer.current); busy.current = false; setTyping(false);
     setMessages([welcome]); setAwaitingCity(false); setDraft(''); input.current?.focus();
@@ -84,16 +85,16 @@ export default function HelpChat() {
   return <div className="miaChat">
     {open && <div className="miaBackdrop" onClick={close} aria-hidden="true"/>}
     {open && <section id="mia-panel" className="miaPanel" role="dialog" aria-modal="true" aria-labelledby="mia-title" ref={panel}>
-      <header className="miaHeader"><span className="miaAvatar"><CinemaIcon name="spark" size={24}/></span><div><h2 id="mia-title">Mia <span>/ Matriculou</span></h2><p><i/>Seu guia de possibilidades</p></div><button onClick={close} aria-label="Fechar conversa">×</button></header>
+      <header className="miaHeader"><span className="miaAvatar"><CinemaIcon name="chat" size={24}/></span><div><h2 id="mia-title">Mia <span>/ Matriculou</span></h2><p><i/>Seu guia de possibilidades</p></div><button onClick={close} aria-label="Fechar conversa">×</button></header>
       <div className="miaToolbar"><span>UMA CONVERSA. NOVOS CAMINHOS.</span><button onClick={download} aria-label="Baixar conversa" title="Baixar conversa"><CinemaIcon name="down" size={15}/></button><button onClick={reset} aria-label="Nova conversa" title="Nova conversa">↺</button></div>
       <div className="miaMessages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens da conversa" ref={log}>
         {messages.map(m => <article key={m.id} className={`miaMessage ${m.from}`}><span>{m.from === 'bot' ? 'MIA' : 'VOCÊ'}</span><p>{m.text}</p>{m.href && <Link href={m.href} onClick={close}>{m.linkLabel}<CinemaIcon name="diagonal" size={15}/></Link>}</article>)}
         {typing && <div className="miaTyping" role="status" aria-label="Mia está respondendo"><i/><i/><i/></div>}
       </div>
       <div className="miaSuggestions" aria-label="Sugestões de perguntas">{suggestions.map(s => <button key={s} disabled={typing} onClick={() => send(s)}>{s}<span aria-hidden="true">↗</span></button>)}</div>
-      <form className="miaForm" onSubmit={submit}><label className="srOnly" htmlFor="mia-input">Sua mensagem</label><input ref={input} id="mia-input" value={draft} onChange={e => setDraft(e.target.value)} placeholder={awaitingCity ? 'Em qual cidade você quer estudar?' : 'O que você quer descobrir?'} maxLength={500} autoComplete="off"/><button disabled={!draft.trim() || typing} aria-label="Enviar mensagem" type="submit"><CinemaIcon name="right" size={20}/></button></form>
-      <p className="miaDisclaimer">Guia automático do catálogo · conversa salva nesta sessão</p>
+      <form className="miaForm" onSubmit={submit}><label className="srOnly" htmlFor="mia-input">Sua mensagem</label><input ref={input} id="mia-input" value={draft} onChange={guard('text', setDraft)} placeholder={awaitingCity ? 'Em qual cidade você quer estudar?' : 'O que você quer descobrir?'} maxLength={500} autoComplete="off"/><button disabled={!draft.trim() || typing} aria-label="Enviar mensagem" type="submit"><CinemaIcon name="right" size={20}/></button></form>
+      <p className="miaDisclaimer">Guia automático do catálogo · conversa salva só neste navegador · não digite dados pessoais</p>
     </section>}
-    <button ref={launcher} className={`miaLauncher ${open ? 'isOpen' : ''}`} onClick={() => setOpen(!open)} aria-label={open ? 'Fechar assistente' : 'Abrir assistente'} aria-expanded={open} aria-controls={open ? 'mia-panel' : undefined}><CinemaIcon name="spark" size={21}/><span>{open ? 'Fechar' : 'Converse com a Mia'}</span><i/></button>
+    <button ref={launcher} className={`miaLauncher ${open ? 'isOpen' : ''}`} onClick={() => setOpen(!open)} aria-label={open ? 'Fechar assistente' : 'Abrir assistente'} aria-expanded={open} aria-controls={open ? 'mia-panel' : undefined}><CinemaIcon name="chat" size={21}/><span>{open ? 'Fechar' : 'Converse com a Mia'}</span><i/></button>
   </div>;
 }

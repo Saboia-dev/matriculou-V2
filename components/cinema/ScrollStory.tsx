@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CinemaIcon } from "./CinemaIcon";
 import { useScrollScene } from "./useScrollScene";
+import { photoAlt } from "./photoAlt";
 
 const stories = {
   possibilities: {
@@ -12,7 +13,7 @@ const stories = {
     chapters: [
       { title: "Um lugar que faz sentido.", text: "Não é só sobre onde estudar. É sobre encontrar um ambiente que combina com seus planos, sua rotina e o que você quer construir.", image: "library", caption: "PERTENCER", icon: "pin", href: "/instituicoes", link: "Encontre o seu lugar" },
       { title: "Uma curiosidade que cresce.", text: "Uma pergunta pode virar interesse. Um interesse pode abrir uma profissão. Conheça as áreas que despertam a sua vontade de aprender.", image: "classroom", caption: "DESCOBRIR", icon: "book", href: "/cursos", link: "Explore os cursos" },
-      { title: "Uma escolha com a sua cara.", text: "Olhe de perto. Compare o que importa. O próximo capítulo fica mais claro quando você conhece suas possibilidades.", image: "future", caption: "TRANSFORMAR", icon: "spark", href: "/comparar", link: "Compare possibilidades" },
+      { title: "Uma escolha com a sua cara.", text: "Olhe de perto. Compare o que importa. O próximo capítulo fica mais claro quando você conhece suas possibilidades.", image: "future", caption: "TRANSFORMAR", icon: "compare", href: "/comparar", link: "Compare possibilidades" },
     ],
   },
   guide: {
@@ -20,10 +21,10 @@ const stories = {
     chapters: [
       { title: "Pesquise", text: "Encontre instituições por nome, cidade, estado, rede, tipo, preço e modalidade. A sua busca começa pelo que importa para você.", image: "library", caption: "ENCONTRE SEU LUGAR", icon: "search", href: "/instituicoes", link: "Começar a pesquisa" },
       { title: "Entenda", text: "Abra uma instituição ou curso para conhecer duração, disciplinas e possibilidades antes de tomar uma decisão.", image: "classroom", caption: "AMPLIE SEU OLHAR", icon: "book", href: "/cursos", link: "Conhecer os cursos" },
-      { title: "Compare", text: "Escolha até quatro instituições e veja localização, avaliação e investimento lado a lado. Cada detalhe ajuda a enxergar melhor.", image: "students", caption: "GANHE PERSPECTIVA", icon: "compare", href: "/comparar", link: "Abrir o comparador" },
+      { title: "Compare", text: "Escolha até quatro instituições e veja localização, conceito MEC e investimento lado a lado. Cada detalhe ajuda a enxergar melhor.", image: "students", caption: "GANHE PERSPECTIVA", icon: "compare", href: "/comparar", link: "Abrir o comparador" },
       { title: "Favorite", text: "Salve suas opções na conta e encontre tudo novamente no seu perfil. Mantenha por perto os lugares que chamaram sua atenção.", image: "library", caption: "GUARDE POSSIBILIDADES", icon: "heart", href: "/perfil", link: "Acessar meu perfil" },
       { title: "Organize", text: "Envie documentos para manter sua jornada organizada. Reúna o que você precisa para continuar sua pesquisa com tranquilidade.", image: "classroom", caption: "PREPARE O PRÓXIMO PASSO", icon: "check", href: "/perfil", link: "Organizar minha jornada" },
-      { title: "Decida", text: "Com informações reunidas em um só lugar, você ganha clareza para escolher o próximo passo. O futuro começa com uma escolha sua.", image: "future", caption: "COMECE UM NOVO CAPÍTULO", icon: "spark", href: "/instituicoes", link: "Explorar possibilidades" },
+      { title: "Decida", text: "Com informações reunidas em um só lugar, você ganha clareza para escolher o próximo passo. O futuro começa com uma escolha sua.", image: "future", caption: "COMECE UM NOVO CAPÍTULO", icon: "check", href: "/instituicoes", link: "Explorar possibilidades" },
     ],
   },
   purpose: {
@@ -31,7 +32,7 @@ const stories = {
     chapters: [
       { title: "Começa com as pessoas.", text: "Pesquisar o futuro pode parecer complicado. A BIJK parte dessa experiência para criar caminhos mais claros entre estudantes, famílias e instituições.", image: "students", caption: "PESSOAS NO CENTRO", icon: "heart", href: "/como-funciona", link: "Conheça a experiência" },
       { title: "Ganha forma na tecnologia.", text: "Informações, comparação e organização se encontram em uma interface pensada para simplificar decisões do dia a dia.", image: "classroom", caption: "TECNOLOGIA COM PROPÓSITO", icon: "globe", href: "/cursos", link: "Descubra os caminhos" },
-      { title: "Continua na sua história.", text: "O Matriculou aproxima você das suas possibilidades. Cada pesquisa é uma oportunidade de encontrar um próximo passo que faça sentido.", image: "future", caption: "UM FUTURO DE POSSIBILIDADES", icon: "spark", href: "/instituicoes", link: "Encontre seu próximo passo" },
+      { title: "Continua na sua história.", text: "O Matriculou aproxima você das suas possibilidades. Cada pesquisa é uma oportunidade de encontrar um próximo passo que faça sentido.", image: "future", caption: "UM FUTURO DE POSSIBILIDADES", icon: "arrow", href: "/instituicoes", link: "Encontre seu próximo passo" },
     ],
   },
 };
@@ -64,7 +65,7 @@ export default function ScrollStory({ variant }: { variant: keyof typeof stories
     <div className="scrollStoryHeading" data-cinema-reveal><span className="filmSectionLabel"><i />{story.label}</span><h2>{story.title}<br /><em>{story.accent}</em></h2><span className="scrollStoryHint"><CinemaIcon name="down" size={15} />Uma história para descobrir ao rolar</span></div>
     <div className="scrollStoryGrid">
       <div className="scrollStoryVisual" aria-hidden="true">
-        <div className="scrollStoryImages">{story.chapters.map((chapter, index) => <div className={`scrollStoryImage ${active === index ? "isActive" : ""}`} key={index}><Image src={`/images/cinema/${chapter.image}.jpg`} alt="" fill sizes="(max-width: 799px) 90vw, 43vw" /></div>)}</div>
+        <div className="scrollStoryImages">{story.chapters.map((chapter, index) => <div className={`scrollStoryImage ${active === index ? "isActive" : ""}`} key={index}><Image src={`/images/cinema/${chapter.image}.jpg`} alt={photoAlt[chapter.image]} fill sizes="(max-width: 799px) 90vw, 43vw" /></div>)}</div>
         <div className="scrollStoryShade" /><span className="scrollStoryViewfinder" />
         <span className="scrollStoryVisualTop">MATRICULOU <i /> HISTÓRIAS EM CONSTRUÇÃO</span>
         <span className="scrollStoryVisualWord" key={active}>{story.chapters[active].caption}</span>

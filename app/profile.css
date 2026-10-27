@@ -1,0 +1,141 @@
+/* Account area: a standard profile layout (cover, overlapping avatar, tabs) in the site's
+   base palette — cream page, white cards, green actions, a dark cover like the page heroes. */
+.accountPage { background: var(--bg); color: var(--ink); min-height: 100vh; padding: 28px max(20px, calc((100vw - 1180px) / 2)) 110px; }
+.accountPage .eyebrow { color: var(--green); }
+
+/* Header card: cover, avatar, name and actions, numbers, tabs. */
+.accountHeader { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; }
+.accountCover { height: 190px; overflow: hidden; background: linear-gradient(100deg, #172229f2 10%, #172229b8 55%, #1722297a), url('/images/cinema/library.jpg') center 40% / cover; position: relative; }
+.accountCover::after { content: ''; position: absolute; right: 8%; top: -70px; width: 260px; height: 260px; border-radius: 50%; border: 1px solid #f1846540; box-shadow: 0 0 0 40px #f184650a, 0 0 0 80px #f1846506; }
+.accountIdentity { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 22px; padding: 0 32px; margin-top: -58px; position: relative; }
+.accountAvatar { position: relative; width: 128px; height: 128px; flex: none; }
+.accountAvatar > img, .accountAvatar > span { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: var(--mint); color: var(--green); font: 700 42px 'Space Grotesk', sans-serif; border: 5px solid var(--paper); box-shadow: 0 10px 30px #18302724; }
+.accountAvatarEdit { position: absolute; right: 2px; bottom: 6px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: #fff; cursor: pointer; border: 3px solid var(--paper); transition: transform .2s, background .2s; }
+.accountAvatarEdit:hover { transform: scale(1.07); background: var(--green2); }
+.accountAvatarEdit:focus-within { outline: 2px solid var(--coral); outline-offset: 3px; }
+.accountAvatarEdit input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.accountName { align-self: start; margin-top: 70px; min-width: 0; }
+.accountName h1 { font: 700 30px/1.15 'Space Grotesk', sans-serif; letter-spacing: -.03em; color: var(--ink); overflow-wrap: anywhere; }
+.accountName p { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 15px; margin-top: 6px; overflow-wrap: anywhere; }
+.accountHeaderActions { display: flex; gap: 10px; align-self: start; margin-top: 74px; }
+
+.accountStats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 26px 32px 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.accountStats > div { padding: 14px 20px; border-left: 1px solid var(--line); display: flex; flex-direction: column-reverse; gap: 2px; }
+.accountStats > div:first-child { border-left: 0; }
+.accountStats dt { color: var(--muted); font-size: 13px; }
+.accountStats dd { font: 700 26px/1.1 'Space Grotesk', sans-serif; color: var(--ink); }
+
+.accountTabs { display: flex; gap: 4px; padding: 0 24px; margin-top: 18px; border-top: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.accountTabs button { display: flex; align-items: center; gap: 8px; padding: 17px 14px 15px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .2s, border-color .2s; }
+.accountTabs button:hover { color: var(--ink); }
+.accountTabs button[aria-current=page] { color: var(--green); border-bottom-color: var(--green); }
+.accountTabs small { min-width: 24px; padding: 1px 7px; border-radius: 20px; background: var(--mint); color: var(--green); font-size: 12px; text-align: center; }
+.accountTabs button[aria-current=page] small { background: var(--green); color: #fff; }
+
+/* Content cards. */
+.accountContent { margin-top: 24px; }
+.accountGrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.accountCard { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 28px; display: grid; gap: 20px; box-shadow: 0 8px 30px #1830270a; }
+.accountNarrow { max-width: 760px; }
+.accountCard > header { display: flex; align-items: center; gap: 14px; }
+.accountCard > header > div { flex: 1; min-width: 0; }
+.accountCard h2 { font: 700 19px 'Space Grotesk', sans-serif; color: var(--ink); letter-spacing: -.02em; }
+.accountCard > header p { color: var(--muted); font-size: 14px; margin-top: 2px; }
+.accountCardIcon { width: 44px; height: 44px; flex: none; border-radius: 13px; display: grid; place-items: center; background: var(--mint); color: var(--green); }
+.accountCard label:not(.accountDrop):not(.legalCheck) { display: grid; gap: 8px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.accountCard input:not([type=file]):not([type=checkbox]) { width: 100%; background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; font-size: 15px; font-weight: 400; outline: 0; transition: border-color .2s, box-shadow .2s; }
+.accountCard input:focus { border-color: var(--green2); box-shadow: 0 0 0 4px #2f7a5a1a; }
+.accountCard input:disabled { color: var(--muted); background: var(--bg); }
+.accountCard .nameEdit { display: flex; gap: 10px; align-items: flex-end; }
+.accountCard .nameEdit label { flex: 1; }
+
+.accountButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border: 1px solid var(--green); border-radius: 12px; background: var(--green); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; transition: background .2s, border-color .2s; white-space: nowrap; }
+.accountButton:hover:not(:disabled) { background: var(--green2); border-color: var(--green2); }
+.accountButton:disabled { opacity: .45; cursor: not-allowed; }
+.accountButton.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.accountButton.ghost:hover:not(:disabled) { background: var(--mint); border-color: var(--mint); }
+.accountButton.danger { background: transparent; color: #b6402b; border-color: #e6b3a7; }
+.accountButton.danger:hover:not(:disabled) { background: #b6402b; border-color: #b6402b; color: #fff; }
+.accountFormActions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.accountActions { display: grid; gap: 10px; }
+.accountAction { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 14px; align-items: center; width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; transition: border-color .2s, background .2s; }
+.accountAction:hover { border-color: var(--green2); background: var(--mint); }
+.accountAction .ico { color: var(--green); }
+.accountAction b { display: block; font-size: 15px; }
+.accountAction small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+.accountDanger { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid #f0cfc6; border-radius: 14px; background: #fdf3f0; }
+.accountDanger b { display: block; color: #9c3522; }
+.accountDanger small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+.accountFavorites { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.accountFavorites article { position: relative; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; transition: box-shadow .2s, transform .2s; }
+.accountFavorites article:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.accountFavorites img { width: 100%; height: 140px; object-fit: cover; display: block; }
+.accountFavorites article > div { padding: 14px 16px 16px; display: grid; gap: 6px; }
+.accountFavorites b { font-size: 15px; line-height: 1.35; color: var(--ink); }
+.accountFavorites span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.accountFavorites button { position: absolute; top: 10px; right: 10px; width: 38px; height: 38px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--coral); color: #fff; cursor: pointer; transition: transform .2s; }
+.accountFavorites button:hover { transform: scale(1.08); }
+.accountFavorites button .cinemaIcon path, .heart.liked .cinemaIcon path { fill: currentColor; }
+
+.accountDrop { display: grid; justify-items: center; gap: 6px; padding: 26px 18px; border: 1.5px dashed #b9cbbf; border-radius: 16px; background: var(--bg); text-align: center; cursor: pointer; position: relative; color: var(--ink); transition: border-color .2s, background .2s; }
+.accountDrop:hover, .accountDrop:focus-within { border-color: var(--green2); background: var(--mint); }
+.accountDrop .ico { color: var(--green); }
+.accountDrop b { font-size: 15px; overflow-wrap: anywhere; }
+.accountDrop span { color: var(--muted); font-size: 13px; }
+.accountDrop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.accountPage .legalCheck { color: var(--muted); }
+.accountPage .legalCheck a, .accountEmpty a { color: var(--green); text-decoration: underline; }
+.accountPage .legalCheck input { accent-color: var(--green); }
+
+.accountDocs { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.accountDocs li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.accountDocIcon { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--mint); color: var(--green); }
+.accountDocs li > div { display: grid; gap: 2px; min-width: 0; }
+.accountDocs a, .accountDocs b { color: var(--ink); font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accountDocs a:hover { color: var(--green); text-decoration: underline; }
+.accountDocs small { color: var(--muted); font-size: 12px; }
+.accountDocs button { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
+.accountDocs button:hover { color: var(--green); border-color: var(--green2); background: var(--mint); }
+.accountDocs button.danger:hover { color: #b6402b; border-color: #e6b3a7; background: #fdf3f0; }
+
+.accountEmpty { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 38px 20px; border: 1.5px dashed var(--line); border-radius: 16px; color: var(--muted); }
+.accountEmpty .ico { color: #b9cbbf; margin-bottom: 4px; }
+.accountEmpty b { color: var(--ink); font-size: 16px; }
+.accountEmpty p { font-size: 14px; max-width: 360px; }
+
+.accountLocked { display: grid; justify-items: center; align-content: center; text-align: center; gap: 14px; padding-top: 120px; }
+.accountLocked h1 { font: 700 clamp(32px, 4.5vw, 52px)/1.08 'Space Grotesk', sans-serif; letter-spacing: -.04em; max-width: 720px; color: var(--ink); }
+.accountLocked p { color: var(--muted); font-size: 16px; }
+.accountLocked .accountCardIcon { width: 68px; height: 68px; border-radius: 20px; }
+
+@media (max-width: 960px) {
+  .accountGrid { grid-template-columns: minmax(0, 1fr); }
+  .accountIdentity { grid-template-columns: auto minmax(0, 1fr); }
+  .accountHeaderActions { grid-column: 1 / -1; padding-bottom: 0; }
+}
+@media (max-width: 600px) {
+  .accountPage { padding-top: 16px; }
+  .accountCover { height: 130px; }
+  .accountIdentity { grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 12px; padding: 0 20px; margin-top: -50px; }
+  .accountAvatar { width: 100px; height: 100px; }
+  .accountName h1 { font-size: 24px; }
+  .accountHeaderActions { flex-wrap: wrap; }
+  .accountStats { margin: 20px 20px 0; }
+  .accountStats > div { padding: 12px 14px; }
+  .accountStats dd { font-size: 22px; }
+  .accountTabs { padding: 0 12px; }
+  .accountTabs button { padding: 15px 10px 13px; font-size: 14px; }
+  .accountCard { padding: 20px; border-radius: 16px; }
+  .accountCard .nameEdit, .accountDanger { flex-direction: column; align-items: stretch; }
+  .accountDocs li { grid-template-columns: 36px minmax(0, 1fr) auto auto; gap: 8px; padding: 10px; }
+}
+@media (max-width: 960px) {
+  .accountHeaderActions { margin-top: 0; }
+}
+@media (max-width: 600px) {
+  .accountName { margin-top: 0; }
+  .accountStats dd, .accountStats dt { text-align: left; }
+}

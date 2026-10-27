@@ -37,8 +37,10 @@ test('the 3D atlas works with keyboard and opens its selected course area', asyn
   await expect(globe).toHaveAttribute('aria-valuetext', 'Saúde');
   await page.getByRole('link', { name: 'Explorar saúde', exact: true }).click();
   await expect(page).toHaveURL(/area=Sa/);
-  await expect(page.locator('.courseLarge')).toHaveCount(3);
   await expect(page.locator('.courseLarge').filter({ hasText: 'Enfermagem' })).toBeVisible();
+  // Database courses can add more health programs (e.g. Odontologia); every card must be Saúde.
+  expect(await page.locator('.courseLarge').count()).toBeGreaterThanOrEqual(3);
+  expect(new Set(await page.locator('.courseLarge > span').allTextContents())).toEqual(new Set(['Saúde']));
 });
 
 test('custom 404 preserves HTTP status and provides working recovery search on mobile', async ({ page }) => {

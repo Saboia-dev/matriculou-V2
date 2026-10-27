@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { loadMotion, scheduleRefresh } from "./loadMotion";
 import type { gsap as GSAP } from "gsap";
 import type { ScrollTrigger as ScrollPlugin } from "gsap/ScrollTrigger";
 import { useCinema } from "./CinemaProvider";
@@ -19,7 +20,7 @@ export function useScrollScene<T extends HTMLElement>(setup: SceneSetup<T>) {
     if (!enabled || lite) { setReady(false); return; }
     let cancelled = false, frame = 0;
     let cleanup = () => {};
-    Promise.all([import("gsap"), import("gsap/ScrollTrigger")]).then(([{ gsap }, { ScrollTrigger }]) => {
+    loadMotion().then(([{ gsap }, { ScrollTrigger }]) => {
       if (cancelled || !ref.current) return;
       gsap.registerPlugin(ScrollTrigger);
       setReady(true);
@@ -27,7 +28,7 @@ export function useScrollScene<T extends HTMLElement>(setup: SceneSetup<T>) {
         if (cancelled || !ref.current) return;
         const context = gsap.context(() => callback.current(gsap, ScrollTrigger, ref.current!), ref);
         cleanup = () => context.revert();
-        ScrollTrigger.refresh();
+        scheduleRefresh(ScrollTrigger);
       });
     }).catch(() => { if (!cancelled) setReady(false); });
     return () => { cancelled = true; cancelAnimationFrame(frame); cleanup(); };

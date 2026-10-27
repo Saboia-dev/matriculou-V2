@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import CatalogQuery from "./CatalogQuery";
 import CinematicHome from "./cinema/CinematicHome";
 import CinematicPageHero from "./cinema/CinematicPageHero";
@@ -10,6 +11,7 @@ import { demoInstitutions, demoOffers } from "../lib/demo-content";
 import { normalize } from "../lib/chat";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -19,6 +21,13 @@ import { useRouter } from "next/navigation";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import type { Institution, Offer, UserProfile, CourseDetail } from "../lib/content";
 import { courseInfo, nav } from "../lib/content";
+import LegalPage, { type LegalView } from "./LegalPages";
+import { CinemaIcon } from "./cinema/CinemaIcon";
+import { illustrationFor } from "../lib/illustrations";
+import { courseArea } from "../lib/areas";
+import { legal, legalLinks } from "../lib/legal";
+import { clean, fieldError, guard } from "../lib/sanitize";
+import { openConsentPreferences } from "../lib/consent";
 
 type View =
   | "home"
@@ -29,34 +38,129 @@ type View =
   | "sobre"
   | "perfil"
   | "login"
-  | "cadastro";
+  | "cadastro"
+  | LegalView;
+
+// Documents live in a private bucket and open only through short-lived links.
+const signedUrlTtl = 60 * 60;
+
+const legalViews: View[] =["privacidade", "termos-uso", "termos-servico", "cookies", "lgpd"];
+
+// Monogram shown when an institution has no licensed photo, so no third-party
+// image is hotlinked and the card keeps its layout.
+const genericWords = /^(colégio|universidade|universitário|faculdade|faculdades|instituto|centro|escola|fundação|federal|estadual|de|da|do|das|dos|e)$/i;
+// Short label for the monogram: "(UFRJ)", "PUC-SP — Campus…", "Faculdades FKB",
+// "(IFSP Sorocaba)" → IFSP, "Centro Universitário Facens" → FACENS.
+const monogram = (name: string) => {
+  const outside = name.replace(/\(.*?\)/g, "").trim();
+  const inParens = name.match(/\(([^)]+)\)/)?.[1]?.trim();
+  const prefix = name.includes(" — ") ? name.split(" — ")[0].trim() : "";
+  const single = (s?: string, max = 10) => (s && !/\s/.test(s) && s.length >= 2 && s.length <= max ? s : undefined);
+  const caps = outside.split(/\s+/).find((w) => /^[A-ZÀ-Ú][A-ZÀ-Ú0-9-]{1,7}$/.test(w));
+  const words = outside.split(/\s+/).filter((w) => /[a-zà-ú]/i.test(w) && w.length > 1 && !genericWords.test(w));
+  const fallback = words.length === 1 && words[0].length <= 12 ? words[0] : words.slice(0, 3).map((w) => w[0]).join("");
+  return (single(inParens) || single(prefix, 8) || caps || single(inParens?.split(" ")[0], 8) || fallback || name.slice(0, 2)).toUpperCase();
+};
+const placeholderImage = (name: string) => {
+  const letters = monogram(name);
+  const size = Math.min(84, Math.floor(520 / letters.length));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260"><rect width="400" height="260" fill="#1d2b33"/><circle cx="330" cy="40" r="120" fill="none" stroke="#f18465" stroke-opacity=".25"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial,sans-serif" font-size="${size}" font-weight="700" fill="#f3f1ea">${letters}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
+// Free licenses (CC BY / CC BY-SA) require author, license and source next to the photo.
+function ImageCredit({ i }: { i: Institution }) {
+  if (!i.image) {
+    const art = illustrationFor(i.id, i.type);
+    return (
+      <p className="imageCredit">
+        <b>Imagem ilustrativa</b>: não mostra {i.name}. Foto: {art.author} · {art.license}
+        {" · "}<a href={art.source} target="_blank" rel="noopener noreferrer">fonte</a>
+      </p>
+    );
+  }
+  if (!i.imageCredit) return null;
+  const { author, license, source } = i.imageCredit;
+  return (
+    <p className="imageCredit">
+      Foto: {author}
+      {license && <> · {license} (adaptada)</>}
+      {source && <> · <a href={source} target="_blank" rel="noopener noreferrer">Wikimedia Commons</a></>}
+    </p>
+  );
+}
+
+// Institutions without a licensed photo get a labelled illustrative picture of a learning
+// space; the monogram is only a fallback if an image fails to load.
+// Served through next/image: WebP at the size each slot needs instead of the 960px source.
+function InstitutionImage({ i, className, sizes = "(max-width: 700px) 92vw, 420px" }: { i: Institution; className?: string; sizes?: string }) {
+  const [failed, setFailed] = useState(false);
+  const art = i.image ? null : illustrationFor(i.id, i.type);
+  const src = i.image || art!.src;
+  const alt = i.image ? `Foto de ${i.name}` : `Imagem ilustrativa: ${art!.alt}`;
+  const title = i.image && i.imageCredit ? `Foto: ${i.imageCredit.author} · ${i.imageCredit.license}` : art ? `Imagem ilustrativa · ${art.author}` : undefined;
+  if (failed || !src.startsWith("/")) {
+    return (
+      <img
+        className={className}
+        src={failed ? placeholderImage(i.name) : src}
+        alt={failed ? `${i.name} (sem foto disponível)` : alt}
+        title={title}
+        width={960}
+        height={640}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <Image className={className} src={src} alt={alt} title={title} width={960} height={640} sizes={sizes} quality={70} onError={() => setFailed(true)} />;
+}
+
+const priceLabel = (i: Institution, suffix = "/mês") =>
+  i.price > 0
+    ? `R$ ${i.price.toLocaleString("pt-BR")}${suffix}`
+    : i.network === "publica"
+    ? "Gratuita (ensino público)"
+    : "Consulte a instituição";
+
+const typeLabels: Record<string, string> = { universidade: "Universidade", faculdade: "Faculdade", tecnico: "Técnico", escola: "Escola", instituto: "Instituto", "centro universitário": "Centro universitário" };
+const typeLabel = (type: string) => typeLabels[type] || (type ? type[0].toUpperCase() + type.slice(1) : "Não informado");
+
+const mecLabel = (i: Institution) => (i.mec ? String(i.mec) : "Não informado");
+
+function DataNotice() {
+  return (
+    <p className="dataNotice">
+      Informações de referência, sujeitas a alteração. Confirme valores, bolsas e conceitos com a instituição e no{" "}
+      <a href="https://emec.mec.gov.br" target="_blank" rel="noopener noreferrer">e-MEC</a>.
+    </p>
+  );
+}
+
+const authError = (message: string) => {
+  if (/already registered|already exists/i.test(message)) return "Este e-mail já possui uma conta. Tente entrar.";
+  if (/password/i.test(message)) return "Escolha uma senha mais forte, com pelo menos 8 caracteres.";
+  if (/email/i.test(message)) return "Informe um e-mail válido.";
+  if (/rate limit|too many/i.test(message)) return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  return "Não foi possível criar a conta agora. Tente novamente.";
+};
+
+function useEscape(onClose: () => void) {
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") close.current(); };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, []);
+}
 
 
+// SVG icons; the size matches the optical size of the text glyphs they replaced.
 const Icon = ({ n, s = 20 }: { n: string; s?: number }) => (
-  <span className="ico" style={{ fontSize: s }}>
-    {(
-      {
-        heart: "♡",
-        search: "⌕",
-        arrow: "→",
-        user: "◉",
-        menu: "☰",
-        close: "×",
-        pin: "⌖",
-        grid: "▦",
-        check: "✓",
-        logout: "↪",
-        upload: "↑",
-        edit: "✎",
-        star: "★",
-        book: "▤",
-        filter: "☷",
-        plus: "+",
-        clock: "◷",
-        file: "□",
-        school: "⌂",
-      } as Record<string, string>
-    )[n] || "✦"}
+  <span className="ico">
+    <CinemaIcon name={n} size={Math.round(s * 0.82)} />
   </span>
 );
 
@@ -72,7 +176,7 @@ const initials = (name = "Usuário") =>
 function MatriculouLogo({ className = "" }: { className?: string }) {
   return (
     <Link className={`matriculouLogo ${className}`} href="/">
-      <img src="/images/matriculou-logo-white.png" alt="Matriculou" />
+      <img src="/images/matriculou-logo-white.png" alt="Matriculou" width={162} height={55} />
     </Link>
   );
 }
@@ -80,7 +184,7 @@ function MatriculouLogo({ className = "" }: { className?: string }) {
 function BIJKLogo({ className = "" }: { className?: string }) {
   return (
     <div className={`bijkLogo ${className}`}>
-      <img src="/images/bijk-logo.png" alt="BIJK" />
+      <img src="/images/bijk-logo.png" alt="BIJK" width={160} height={160} loading="lazy" />
     </div>
   );
 }
@@ -88,10 +192,12 @@ function BIJKLogo({ className = "" }: { className?: string }) {
 function NavBar({
   user,
   onMenu,
+  menuOpen,
   activeView,
 }: {
   user: UserProfile | null;
   onMenu: () => void;
+  menuOpen: boolean;
   activeView: View;
 }) {
   return (
@@ -133,7 +239,7 @@ function NavBar({
               </span>
 
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt="Foto de perfil" />
+                <img src={user.avatar_url} alt="Foto de perfil" width={36} height={36} />
               ) : (
                 <span className="avatar">{initials(user.name)}</span>
               )}
@@ -154,6 +260,8 @@ function NavBar({
             className="menuBtn"
             onClick={onMenu}
             aria-label="Abrir menu"
+            aria-expanded={menuOpen}
+            aria-controls="menu-principal"
           >
             <Icon n="menu" s={23} />
           </button>
@@ -200,9 +308,9 @@ function MobileMenu({
     <>
       <div className="overlay" onClick={onClose} />
 
-      <aside className="mobileMenu" ref={panel} role="dialog" aria-modal="true" aria-label="Menu de navegação">
+      <aside className="mobileMenu" id="menu-principal" ref={panel} role="dialog" aria-modal="true" aria-label="Menu de navegação">
         <button className="closeBtn" onClick={onClose} aria-label="Fechar menu">
-          ×
+          <Icon n="close" s={24} />
         </button>
 
         <MatriculouLogo />
@@ -255,22 +363,16 @@ function InstitutionCard({
   return (
     <article className="instCard" data-cinema-tilt>
       <div className="instImage">
-        <img
-          src={i.image || "/images/course-icons/educacao.svg"}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={(e) => {
-            e.currentTarget.src = "/images/course-icons/educacao.svg";
-          }}
-        />
+        <InstitutionImage i={i} />
+        {!i.image && <span className="illustrativeTag">Imagem ilustrativa</span>}
 
         <span className="badge">
-          {i.network === "publica" ? "Pública" : "Privada"} · {i.type}
+          {i.network === "publica" ? "Pública" : "Privada"} · {typeLabel(i.type)}
         </span>
 
         <button
-          aria-label="Favoritar"
+          aria-label={liked ? `Remover ${i.name} dos favoritos` : `Favoritar ${i.name}`}
+          aria-pressed={liked}
           className={liked ? "heart liked" : "heart"}
           onClick={onLike}
         >
@@ -280,8 +382,7 @@ function InstitutionCard({
 
       <div className="instBody">
         <div className="rating">
-          <span>★ {Number(i.rating || 0).toFixed(1)}</span>
-          <span>• MEC {i.mec || "-"}</span>
+          <span>Conceito MEC: {mecLabel(i)}</span>
         </div>
 
         <h3>{i.name}</h3>
@@ -291,18 +392,14 @@ function InstitutionCard({
         </p>
 
         <div className="chips">
-          <span>{i.scholarships ? "Bolsas" : "Sem bolsa"}</span>
+          <span>{i.scholarships ? "Bolsas" : "Bolsas não informadas"}</span>
 
-          <span>
-            {i.price > 0
-              ? `R$ ${i.price.toLocaleString("pt-BR")}/mês`
-              : "Gratuita"}
-          </span>
+          <span>{priceLabel(i)}</span>
         </div>
 
         <div className="cardActions">
           <button className="outline" onClick={onCompare}>
-            <Icon n="grid" s={17} /> Comparar
+            <Icon n="compare" s={18} /> Comparar
           </button>
 
           <button className="button" onClick={onOpen}>
@@ -323,25 +420,26 @@ function InstitutionModal({
   onClose: () => void;
   onCompare: () => void;
 }) {
+  useEscape(onClose);
   return (
     <div className="modalBackdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="closeBtn" onClick={onClose}>
-          ×
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="institution-modal-title" onClick={(e) => e.stopPropagation()}>
+        <button className="closeBtn" onClick={onClose} aria-label="Fechar detalhes" autoFocus>
+          <Icon n="close" s={24} />
         </button>
 
-        <img className="modalImage" src={i.image} alt="" />
+        <InstitutionImage i={i} className="modalImage" sizes="(max-width: 900px) 100vw, 900px" />
 
         <div className="modalBody">
           <span className="eyebrow">
-            {i.network === "publica" ? "Pública" : "Privada"} · {i.type}
+            {i.network === "publica" ? "Pública" : "Privada"} · {typeLabel(i.type)}
           </span>
 
-          <h2>{i.name}</h2>
+          <h2 id="institution-modal-title">{i.name}</h2>
 
           <p>
             Tenha uma visão rápida da instituição antes de decidir. Consulte
-            localização, avaliação, investimento, bolsas e situação de vagas.
+            localização, conceito MEC, investimento e bolsas.
           </p>
 
           <div className="detailGrid">
@@ -353,22 +451,13 @@ function InstitutionModal({
             </div>
 
             <div>
-              <small>Avaliação</small>
-              <b>★ {Number(i.rating || 0).toFixed(1)}</b>
-            </div>
-
-            <div>
-              <small>Nota MEC</small>
-              <b>{i.mec || "-"}</b>
+              <small>Conceito MEC</small>
+              <b>{mecLabel(i)}</b>
             </div>
 
             <div>
               <small>Mensalidade média</small>
-              <b>
-                {i.price > 0
-                  ? `R$ ${i.price.toLocaleString("pt-BR")}`
-                  : "Gratuita"}
-              </b>
+              <b>{priceLabel(i, "")}</b>
             </div>
 
             <div>
@@ -382,15 +471,13 @@ function InstitutionModal({
             </div>
 
             <div>
-              <small>Vagas</small>
-              <b>{i.vacancy || "Consulte"}</b>
-            </div>
-
-            <div>
-              <small>Avaliações</small>
-              <b>{i.reviews || 0}</b>
+              <small>Vagas e inscrições</small>
+              <b>Consulte a instituição</b>
             </div>
           </div>
+
+          <DataNotice />
+          <ImageCredit i={i} />
 
           <button
             className="button"
@@ -399,7 +486,7 @@ function InstitutionModal({
               onClose();
             }}
           >
-            Adicionar à comparação <Icon n="grid" s={18} />
+            Adicionar à comparação <Icon n="compare" s={18} />
           </button>
         </div>
       </div>
@@ -429,6 +516,9 @@ function InstitutionsView({
   const [state, setState] = useState("todos");
   const [mode, setMode] = useState("todos");
   const [max, setMax] = useState("");
+  // Progressive rendering: the first cards paint immediately, the rest join in idle time,
+  // so a 100+ item catalog never blocks input. Counts and filters still use the full list.
+  const [limit, setLimit] = useState(12);
 
   const types = [
     ...new Set(institutions.map((i) => i.type).filter(Boolean)),
@@ -466,8 +556,19 @@ function InstitutionsView({
         )
     );
 
+  useEffect(() => {
+    if (limit >= filtered.length) return;
+    const next = () => setLimit((current) => current + 12);
+    if ("requestIdleCallback" in window) {
+      const id = requestIdleCallback(next, { timeout: 300 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(next, 50);
+    return () => clearTimeout(id);
+  }, [limit, filtered.length]);
+
   return (
-    <main className="page">
+    <main className="page" id="conteudo">
       <CatalogQuery onChange={params => {
     setQ(params.get("q") || "");
     setNetwork(["publica", "privada"].includes(params.get("rede") || "") ? params.get("rede")! : "todas");
@@ -476,7 +577,7 @@ function InstitutionsView({
     setMax(price && Number.isFinite(Number(price)) && Number(price) >= 0 ? price : "");
         }}/><CinematicPageHero kind="institutions">
         <span className="eyebrow white">
-          Instituições atualizadas
+          Catálogo de instituições
         </span>
 
         <h1>Encontre a instituição certa.</h1>
@@ -516,7 +617,8 @@ function InstitutionsView({
               <span>Pesquisar</span>
               <input
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                maxLength={120}
+                onChange={guard("text", setQ)}
                 placeholder="Instituição, cidade ou estado"
               />
             </label>
@@ -534,7 +636,7 @@ function InstitutionsView({
               <span>Tipo</span>
               <select aria-label="Tipo de instituição" value={type} onChange={(e) => setType(e.target.value)}>
                 <option value="todos">Todos os tipos</option>
-                {types.map((x) => <option key={x} value={x}>{x}</option>)}
+                {types.map((x) => <option key={x} value={x}>{typeLabel(x)}</option>)}
               </select>
             </label>
 
@@ -574,7 +676,7 @@ function InstitutionsView({
           <div className="activeFilters">
             {q && <span>Busca: {q}</span>}
             {network !== "todas" && <span>{network === "publica" ? "Pública" : "Privada"}</span>}
-            {type !== "todos" && <span>{type}</span>}
+            {type !== "todos" && <span>{typeLabel(type)}</span>}
             {state !== "todos" && <span>{state}</span>}
             {mode !== "todos" && <span>{mode === "ead" ? "EAD" : mode === "hibrido" ? "Híbrido" : "Presencial"}</span>}
             {max && <span>Até R$ {Number(max).toLocaleString("pt-BR")}</span>}
@@ -588,7 +690,7 @@ function InstitutionsView({
         </div>
 
         <div className="cards3">
-          {filtered.map((i) => (
+          {filtered.slice(0, limit).map((i) => (
             <InstitutionCard
               key={i.id}
               i={i}
@@ -612,13 +714,14 @@ function InstitutionsView({
 
 const getCourseDetail = (name: string): CourseDetail => {
   const info = courseInfo.find((c) => c.name.toLowerCase() === name.toLowerCase());
-  if (info) return info;
+  const { area, icon } = courseArea(name);
+  if (info) return { ...info, icon };
 
   return {
     name,
-    area: "Outras áreas",
+    area,
     duration: "Consulte",
-    icon: "/images/course-icons/educacao.svg",
+    icon,
     desc: "Consulte a instituição para conhecer a estrutura e as características específicas deste curso.",
     price: 0,
     grade: [],
@@ -654,22 +757,26 @@ function CourseModal({
     )
   );
 
+  useEscape(onClose);
   return (
     <div className="modalBackdrop" onClick={onClose}>
       <div
         className="modal courseModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="course-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <button className="closeBtn" onClick={onClose}>
-          ×
+        <button className="closeBtn" onClick={onClose} aria-label="Fechar detalhes do curso" autoFocus>
+          <Icon n="close" s={24} />
         </button>
 
         <div className="courseModalHead">
-          <img src={course.icon} alt="" />
+          <img src={course.icon} alt={`Ícone da área de ${course.area}`} width={92} height={92} />
 
           <div>
             <span className="eyebrow">{course.area}</span>
-            <h2>{course.name}</h2>
+            <h2 id="course-modal-title">{course.name}</h2>
             <p>{course.desc}</p>
           </div>
         </div>
@@ -677,7 +784,7 @@ function CourseModal({
         <div className="detailGrid courseDetailGrid">
           <div><small>Formação</small><b>{course.level}</b></div>
           <div><small>Duração</small><b>{course.duration}</b></div>
-          <div><small>Preço médio</small><b>{course.price ? `R$ ${course.price.toLocaleString("pt-BR")}/mês` : "Varia por instituição"}</b></div>
+          <div><small>Preço médio (referência)</small><b>{course.price ? `R$ ${course.price.toLocaleString("pt-BR")}/mês` : "Varia por instituição"}</b></div>
           <div><small>Instituições</small><b>{related.length || "Consulte"}</b></div>
           <div><small>Modalidade</small><b>{course.modality}</b></div>
           <div><small>Turnos</small><b>{course.shifts.join(" · ")}</b></div>
@@ -740,6 +847,8 @@ function CourseModal({
             ))}
           </div>
         )}
+
+        <DataNotice />
       </div>
     </div>
   );
@@ -771,7 +880,7 @@ function CourseCompareTable({
     ["Área", (c: CourseDetail) => values(c).area],
     ["Formação", (c: CourseDetail) => values(c).level],
     ["Duração", (c: CourseDetail) => values(c).duration],
-    ["Preço médio", (c: CourseDetail) => values(c).price],
+    ["Preço médio (referência)", (c: CourseDetail) => values(c).price],
     ["Modalidade", (c: CourseDetail) => values(c).modality],
     ["Turnos", (c: CourseDetail) => values(c).shifts],
     ["Perfil do curso", (c: CourseDetail) => values(c).profile],
@@ -809,7 +918,7 @@ function CourseCompareTable({
                 <th key={c.name}>
                   <div className="compareCourseHead">
                     <div className="compareCourseIcon">
-                      <img src={c.icon} alt="" />
+                      <img src={c.icon} alt={`Ícone da área de ${c.area}`} width={48} height={48} loading="lazy" />
                     </div>
 
                     <div>
@@ -831,7 +940,7 @@ function CourseCompareTable({
                   <td key={`${label}-${c.name}`}>
                     <span
                       className={
-                        label === "Preço médio"
+                        label === "Preço médio (referência)"
                           ? "compareValue strong"
                           : "compareValue"
                       }
@@ -845,6 +954,8 @@ function CourseCompareTable({
           </tbody>
         </table>
       </div>
+
+      <DataNotice />
 
       <div className="courseCompareFooter">
         <span>
@@ -885,8 +996,9 @@ function CoursesView({
   ];
 
   const areas = [
-    ...new Set(courseInfo.map((c) => c.area)),
-  ];
+    ...new Set([...courseInfo.map((c) => c.area), ...names.map((n) => getCourseDetail(n).area)]),
+  ].filter((a) => a !== "Outras áreas");
+  const activeArea = areas.includes(area) ? area : "Todas";
 
   const data = names.length
     ? [
@@ -903,12 +1015,23 @@ function CoursesView({
     )
     .filter(
       (n) =>
-        area === "Todas" ||
-        courseInfo.find((c) => c.name === n)?.area ===
-          area
+        activeArea === "Todas" ||
+        getCourseDetail(n).area === activeArea
     );
 
   const detail = (name: string): CourseDetail => getCourseDetail(name);
+
+  // Institutions per course, built once per data load instead of per card and render.
+  const institutionsByCourse = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const o of offers) {
+      const key = o.course_name?.toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key)!.add(o.institution_id);
+    }
+    return map;
+  }, [offers]);
 
   const compareCourses = compareIds.map(detail);
 
@@ -925,11 +1048,11 @@ function CoursesView({
   };
 
   return (
-    <main className="page">
+    <main className="page" id="conteudo">
       <CatalogQuery onChange={params => {
     setQ(params.get("q") || "");
     const requestedArea = params.get("area");
-    setArea(courseInfo.some(c => c.area === requestedArea) ? requestedArea! : "Todas");
+    setArea(requestedArea && requestedArea.length < 40 ? requestedArea : "Todas");
         }}/><CinematicPageHero kind="courses">
         <span className="eyebrow white">
           Explore cursos
@@ -951,19 +1074,22 @@ function CoursesView({
 
               <input
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                maxLength={120}
+                onChange={guard("text", setQ)}
                 placeholder="Pesquisar curso..."
+                aria-label="Pesquisar curso"
               />
             </div>
 
             {["Todas", ...areas].map((a) => (
               <button
                 className={
-                  area === a
+                  activeArea === a
                     ? "filterPill active"
                     : "filterPill"
                 }
                 key={a}
+                aria-pressed={activeArea === a}
                 onClick={() => setArea(a)}
               >
                 {a}
@@ -1006,14 +1132,7 @@ function CoursesView({
             {filtered.map((name) => {
               const info = detail(name);
 
-              const rel = institutions.filter((i) =>
-                offers.some(
-                  (o) =>
-                    o.course_name?.toLowerCase() ===
-                      name.toLowerCase() &&
-                    o.institution_id === i.id
-                )
-              );
+              const relCount = institutionsByCourse.get(name.toLowerCase())?.size ?? 0;
 
               const isSelected =
                 compareIds.includes(name);
@@ -1028,7 +1147,7 @@ function CoursesView({
                   key={name}
                 >
                   <div className="courseLargeIcon">
-                    <img src={info.icon} alt="" />
+                    <img src={info.icon} alt={`Ícone da área de ${info.area}`} width={58} height={58} loading="lazy" />
                   </div>
 
                   <span>{info.area}</span>
@@ -1041,8 +1160,8 @@ function CoursesView({
                     <b>{info.duration}</b>
 
                     <span>
-                      {rel.length
-                        ? `${rel.length} instituições`
+                      {relCount
+                        ? `${relCount} instituições`
                         : "Consulte opções"}
                     </span>
                   </div>
@@ -1054,12 +1173,13 @@ function CoursesView({
                           ? "compareToggle selected"
                           : "compareToggle"
                       }
+                      aria-pressed={isSelected}
                       onClick={() =>
                         toggleCompare(name)
                       }
                     >
                       <span>
-                        {isSelected ? "✓" : "□"}
+                        <Icon n={isSelected ? "check" : "compare"} s={18} />
                       </span>{" "}
                       {isSelected
                         ? "Selecionado"
@@ -1110,13 +1230,11 @@ function InstitutionCompareTable({
 }) {
   const rows = [
     ["Rede", (i: Institution) => i.network === "publica" ? "Pública" : "Privada"],
-    ["Tipo", (i: Institution) => i.type || "Não informado"],
+    ["Tipo", (i: Institution) => typeLabel(i.type)],
     ["Localização", (i: Institution) => `${i.city}, ${i.state}`],
-    ["Avaliação", (i: Institution) => `★ ${Number(i.rating || 0).toFixed(1)} (${i.reviews || 0} avaliações)`],
-    ["Nota MEC", (i: Institution) => i.mec || "Não informada"],
-    ["Mensalidade média", (i: Institution) => i.price ? `R$ ${i.price.toLocaleString("pt-BR")}/mês` : "Gratuita"],
+    ["Conceito MEC", (i: Institution) => mecLabel(i)],
+    ["Mensalidade média", (i: Institution) => priceLabel(i)],
     ["Bolsas", (i: Institution) => i.scholarships ? "Disponíveis" : "Não informadas"],
-    ["Situação de vagas", (i: Institution) => i.vacancy || "Consulte"],
   ] as const;
 
   return (
@@ -1141,7 +1259,7 @@ function InstitutionCompareTable({
                 <th key={i.id}>
                   <div className="compareCourseHead">
                     <div className="compareInstitutionIcon">
-                      <img src={i.image || "/images/course-icons/educacao.svg"} alt="" />
+                      <InstitutionImage i={i} sizes="96px" />
                     </div>
                     <div>
                       <b>{i.name}</b>
@@ -1153,7 +1271,7 @@ function InstitutionCompareTable({
                       aria-label={`Remover ${i.name} da comparação`}
                       title="Remover da comparação"
                     >
-                      ×
+                      <Icon n="close" s={18} />
                     </button>
                   </div>
                 </th>
@@ -1166,7 +1284,7 @@ function InstitutionCompareTable({
                 <th>{label}</th>
                 {institutions.map((i) => (
                   <td key={`${label}-${i.id}`}>
-                    <span className={label === "Avaliação" || label === "Mensalidade média" ? "compareValue strong" : "compareValue"}>
+                    <span className={label === "Mensalidade média" ? "compareValue strong" : "compareValue"}>
                       {get(i)}
                     </span>
                   </td>
@@ -1176,6 +1294,8 @@ function InstitutionCompareTable({
           </tbody>
         </table>
       </div>
+
+      <DataNotice />
 
       <div className="courseCompareFooter">
         <span><Icon n="check" s={17} /> {institutions.length} instituições selecionadas para comparação</span>
@@ -1216,11 +1336,11 @@ function Compare({ institutions }: { institutions: Institution[] }) {
   const options = institutions.filter((i) => (type === "todos" || i.type === type) && !ids.includes(i.id));
 
   return (
-    <main className="page">
+    <main className="page" id="conteudo">
       <CinematicPageHero kind="compare">
         <span className="eyebrow white">Comparador</span>
         <h1>Compare com calma.</h1>
-        <p>Escolha até quatro instituições e veja localização, avaliação, investimento, bolsas e vagas em uma única visão.</p>
+        <p>Escolha até quatro instituições e veja localização, conceito MEC, investimento e bolsas em uma única visão.</p>
       </CinematicPageHero>
 
       <section className="compareArea">
@@ -1241,12 +1361,12 @@ function Compare({ institutions }: { institutions: Institution[] }) {
                   <div className={i ? "compareSlot filled" : "compareSlot"} key={slot}>
                     {i ? (
                       <>
-                        <img src={i.image || "/images/course-icons/educacao.svg"} alt="" />
+                        <InstitutionImage i={i} sizes="160px" />
                         <div><b>{i.name}</b><span>{i.city}, {i.state}</span></div>
-                        <button onClick={() => remove(i.id)} aria-label={`Remover ${i.name}`}>×</button>
+                        <button onClick={() => remove(i.id)} aria-label={`Remover ${i.name}`}><Icon n="close" s={20} /></button>
                       </>
                     ) : (
-                      <><span className="compareSlotPlus">+</span><span>Adicionar instituição</span></>
+                      <><span className="compareSlotPlus"><Icon n="plus" s={28} /></span><span>Adicionar instituição</span></>
                     )}
                   </div>
                 );
@@ -1254,8 +1374,8 @@ function Compare({ institutions }: { institutions: Institution[] }) {
             </div>
 
             <div className="compareHint">
-              <div className="emptyIcon">▦</div>
-              <div><b>Monte sua comparação</b><span>Escolha instituições e veja diferenças de preço, avaliação, bolsas e vagas em uma única visão.</span></div>
+              <div className="emptyIcon"><Icon n="compare" s={32} /></div>
+              <div><b>Monte sua comparação</b><span>Escolha instituições e veja diferenças de preço, conceito MEC e bolsas em uma única visão.</span></div>
             </div>
           </div>
         ) : (
@@ -1263,31 +1383,38 @@ function Compare({ institutions }: { institutions: Institution[] }) {
         )}
       </section>
 
-      {modal && (
-        <div className="modalBackdrop" onClick={() => setModal(false)}>
-          <div className="picker comparePicker" onClick={(e) => e.stopPropagation()}>
-            <button className="closeBtn" onClick={() => setModal(false)}>×</button>
+      {modal && <ComparePicker onClose={() => setModal(false)}>
             <span className="eyebrow">Adicionar ao comparador</span>
-            <h2>Escolha suas instituições.</h2>
+            <h2 id="compare-picker-title">Escolha suas instituições.</h2>
             <p>Filtre por tipo e selecione até quatro opções para comparar.</p>
             <div className="pickerTypes">
               <button className={type === "todos" ? "active" : ""} onClick={() => setType("todos")}>Todas</button>
-              {types.map((t) => <button className={type === t ? "active" : ""} key={t} onClick={() => setType(t)}>{t}</button>)}
+              {types.map((t) => <button className={type === t ? "active" : ""} key={t} onClick={() => setType(t)}>{typeLabel(t)}</button>)}
             </div>
             <div className="pickerList">
               {options.map((i) => (
                 <button key={i.id} onClick={() => add(i.id)}>
-                  <img src={i.image || "/images/course-icons/educacao.svg"} alt="" />
+                  <InstitutionImage i={i} sizes="96px" />
                   <span><b>{i.name}</b><small>{i.city}, {i.state} · {i.network === "publica" ? "Pública" : "Privada"}</small></span>
                   <strong>Adicionar</strong>
                 </button>
               ))}
               {!options.length && <div className="emptySmall">Não há outras instituições disponíveis com este filtro.</div>}
             </div>
-          </div>
-        </div>
-      )}
+      </ComparePicker>}
     </main>
+  );
+}
+
+function ComparePicker({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  useEscape(onClose);
+  return (
+    <div className="modalBackdrop" onClick={onClose}>
+      <div className="picker comparePicker" role="dialog" aria-modal="true" aria-labelledby="compare-picker-title" onClick={(e) => e.stopPropagation()}>
+        <button className="closeBtn" onClick={onClose} aria-label="Fechar seleção" autoFocus><Icon n="close" s={24} /></button>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -1296,16 +1423,18 @@ function Profile({
   onUser,
   liked,
   onLike,
+  onLogout,
   showToast,
 }: {
   user: UserProfile;
   onUser: (u: UserProfile) => void;
   liked: Institution[];
   onLike: (id: string) => void;
+  onLogout: () => void;
   showToast: (s: string) => void;
 }) {
   const [section, setSection] = useState<
-    "dados" | "documentos" | "favoritos"
+    "dados" | "documentos" | "favoritos" | "privacidade"
   >("dados");
 
   const [docs, setDocs] = useState<
@@ -1322,6 +1451,15 @@ function Profile({
   const [docFile, setDocFile] = useState<File | null>(null);
   const [editingDoc, setEditingDoc] = useState<string | null>(null);
   const [docBusy, setDocBusy] = useState(false);
+  const [docConsent, setDocConsent] = useState(false);
+  const [name, setName] = useState(user.name);
+  const [nameBusy, setNameBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [comparing, setComparing] = useState(0);
+
+  useEffect(() => {
+    try { setComparing(JSON.parse(sessionStorage.getItem("matriculou-compare") || "[]").length); } catch {}
+  }, []);
 
   useEffect(() => {
     const loadDocs = async () => {
@@ -1332,14 +1470,16 @@ function Profile({
         ascending: false,
       });
 
+      const rows = data || [];
+      const paths = rows.map((doc) => doc.path).filter(Boolean) as string[];
+      const { data: signed } = paths.length
+        ? await supabase.storage.from("pre-matriculas").createSignedUrls(paths, signedUrlTtl)
+        : { data: [] };
+
       setDocs(
-        (data || []).map((doc) => ({
+        rows.map((doc) => ({
           ...doc,
-          url: doc.path
-            ? supabase.storage
-                .from("pre-matriculas")
-                .getPublicUrl(doc.path).data.publicUrl
-            : "",
+          url: signed?.find((s) => s.path === doc.path)?.signedUrl || "",
         }))
       );
     };
@@ -1347,11 +1487,66 @@ function Profile({
     loadDocs();
   }, []);
 
+  const saveName = async () => {
+    const next = clean(name);
+    if (next.length < 2) return showToast("Informe seu nome completo.");
+    const invalid = fieldError(next, "name");
+    if (invalid) return showToast(invalid);
+    setNameBusy(true);
+    const { error } = await supabase.from("usuarios").update({ nome_completo: next }).eq("id", user.id);
+    setNameBusy(false);
+    if (error) return showToast("Não foi possível atualizar o nome.");
+    onUser({ ...user, name: next });
+    showToast("Nome atualizado");
+  };
+
+  // Portabilidade (LGPD, art. 18, V): a copy of everything stored for this account.
+  const exportData = async () => {
+    const [profile, favorites, documents] = await Promise.all([
+      supabase.from("usuarios").select("*").eq("id", user.id).maybeSingle(),
+      supabase.from("favoritos").select("instituicao_id,instituicao_nome,created_at").eq("user_id", user.id),
+      supabase.from("documentos_usuario").select("nome,path,created_at").eq("user_id", user.id),
+    ]);
+    const payload = { exportado_em: new Date().toISOString(), controlador: legal.controller, perfil: profile.data, favoritos: favorites.data || [], documentos: documents.data || [] };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "meus-dados-matriculou.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const deleteAccount = async () => {
+    if (!window.confirm("Excluir sua conta apaga cadastro, favoritos, foto e documentos. Essa ação não pode ser desfeita. Deseja continuar?")) return;
+    setDeleting(true);
+    for (const bucket of ["pre-matriculas", "avatars"]) {
+      const { data: root } = await supabase.storage.from(bucket).list(user.id);
+      const { data: nested } = await supabase.storage.from(bucket).list(`${user.id}/documentos`);
+      const files = [
+        ...(root || []).filter((f) => f.id).map((f) => `${user.id}/${f.name}`),
+        ...(nested || []).filter((f) => f.id).map((f) => `${user.id}/documentos/${f.name}`),
+      ];
+      if (files.length) await supabase.storage.from(bucket).remove(files);
+    }
+    const { error } = await supabase.rpc("delete_own_account");
+    if (error) {
+      setDeleting(false);
+      showToast("Não foi possível excluir a conta agora. Use o formulário LGPD para concluir o pedido.");
+      return;
+    }
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
   const avatar = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       return showToast(
         "Escolha uma imagem válida."
       );
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      return showToast("A foto de perfil deve ter até 2 MB.");
     }
 
     const ext =
@@ -1422,6 +1617,11 @@ function Profile({
       return;
     }
 
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("O documento deve ter até 10 MB.");
+      return;
+    }
+
     setDocFile(file);
   };
 
@@ -1432,15 +1632,25 @@ function Profile({
   };
 
   const saveDoc = async () => {
-    const name = docName.trim();
+    const name = clean(docName);
     if (!name) {
       showToast("Informe o nome do documento.");
+      return;
+    }
+    const invalid = fieldError(name, "text");
+    if (invalid) {
+      showToast(invalid);
       return;
     }
 
     const currentDoc = docs.find((doc) => doc.id === editingDoc);
     if (!editingDoc && !docFile) {
       showToast("Envie uma foto do documento.");
+      return;
+    }
+
+    if (docFile && !docConsent) {
+      showToast("Confirme o consentimento para guardar o documento.");
       return;
     }
 
@@ -1471,9 +1681,10 @@ function Profile({
         return;
       }
 
-      url = `${supabase.storage
+      const { data: signed } = await supabase.storage
         .from("pre-matriculas")
-        .getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
+        .createSignedUrl(path, signedUrlTtl);
+      url = signed?.signedUrl || "";
     }
 
     if (editingDoc) {
@@ -1560,378 +1771,262 @@ function Profile({
     showToast("Documento apagado");
   };
 
+  const sections = [
+    { id: "dados", label: "Minha conta", icon: "user", count: null },
+    { id: "favoritos", label: "Favoritos", icon: "heart", count: liked.length },
+    { id: "documentos", label: "Documentos", icon: "file", count: docs.length },
+    { id: "privacidade", label: "Privacidade", icon: "shield", count: null },
+  ] as const;
+
   return (
-    <main className="profilePage">
-      <div className="profileShell">
-        <aside className="profileSidebar">
-          <div className="sideIdentity">
+    <main className="accountPage" id="conteudo">
+      <section className="accountHeader">
+        <div className="accountCover" aria-hidden="true" />
+
+        <div className="accountIdentity">
+          <div className="accountAvatar">
             {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt="Foto de perfil"
-              />
+              <img src={user.avatar_url} alt={`Foto de perfil de ${user.name}`} width={128} height={128} />
             ) : (
-              <span>
-                {initials(user.name)}
-              </span>
+              <span aria-hidden="true">{initials(user.name)}</span>
             )}
-
-            <div>
-              <b>{user.name}</b>
-              <small>{user.email}</small>
-            </div>
-          </div>
-
-          <div className="sideNav">
-            <button
-              className={
-                section === "dados"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                setSection("dados")
-              }
-            >
-              <Icon n="user" /> Dados da conta
-            </button>
-
-            <button
-              className={
-                section === "favoritos"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                setSection("favoritos")
-              }
-            >
-              <Icon n="heart" /> Favoritos{" "}
-              <span>{liked.length}</span>
-            </button>
-
-            <button
-              className={
-                section === "documentos"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                setSection("documentos")
-              }
-            >
-              <Icon n="file" /> Documentos{" "}
-              <span>{docs.length}</span>
-            </button>
-          </div>
-
-          <Link
-            href="/instituicoes"
-            className="sideCta"
-          >
-            Encontrar instituições{" "}
-            <Icon n="arrow" />
-          </Link>
-        </aside>
-
-        <section className="profileMain">
-          <div className="profileTitle">
-            <div>
-              <span className="eyebrow">
-                Meu perfil
-              </span>
-
-              <h1>
-                Olá,{" "}
-                {user.name.split(" ")[0]}.
-              </h1>
-
-              <p>
-                Seu espaço para organizar escolhas,
-                favoritas e documentos.
-              </p>
-            </div>
-
-            <label className="button gold uploadAvatar">
-              <Icon n="upload" /> Mudar imagem
-
+            <label className="accountAvatarEdit" title="Trocar foto de perfil">
+              <Icon n="camera" s={20} />
+              <span className="srOnly">Trocar foto de perfil</span>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                onChange={(e) =>
-                  e.target.files?.[0] &&
-                  avatar(
-                    e.target.files[0]
-                  )
-                }
+                onChange={(e) => e.target.files?.[0] && avatar(e.target.files[0])}
               />
             </label>
           </div>
 
-          {section === "dados" && (
-            <div className="profileGrid">
-              <div className="profileCard">
-                <span className="eyebrow">
-                  Conta
-                </span>
+          <div className="accountName">
+            <h1>{user.name}</h1>
+            <p><Icon n="mail" s={17} /> {user.email}</p>
+          </div>
 
-                <h2>Seus dados</h2>
+          <div className="accountHeaderActions">
+            <Link href="/instituicoes" className="accountButton">
+              <Icon n="search" s={17} /> Encontrar instituições
+            </Link>
+            <button type="button" className="accountButton ghost" onClick={onLogout}>
+              <Icon n="logout" s={17} /> Sair
+            </button>
+          </div>
+        </div>
 
+        <dl className="accountStats">
+          <div><dt>Favoritas</dt><dd>{liked.length}</dd></div>
+          <div><dt>Documentos</dt><dd>{docs.length}</dd></div>
+          <div><dt>No comparador</dt><dd>{comparing}/4</dd></div>
+        </dl>
+
+        <nav className="accountTabs" aria-label="Seções do perfil">
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={section === item.id ? "page" : undefined}
+              onClick={() => setSection(item.id)}
+            >
+              <Icon n={item.icon} s={19} />
+              <span>{item.label}</span>
+              {item.count !== null && <small>{item.count}</small>}
+            </button>
+          ))}
+        </nav>
+      </section>
+
+      <section className="accountContent">
+        {section === "dados" && (
+          <div className="accountGrid">
+            <article className="accountCard">
+              <header>
+                <span className="accountCardIcon"><Icon n="user" s={21} /></span>
+                <div><h2>Informações pessoais</h2><p>Mantenha seu nome sempre atualizado.</p></div>
+              </header>
+
+              <div className="nameEdit">
                 <label>
                   Nome completo
-
-                  <input
-                    value={user.name}
-                    readOnly
-                  />
+                  <input value={name} maxLength={120} autoComplete="name" onChange={guard("name", setName)} />
                 </label>
-
-                <label>
-                  E-mail
-
-                  <input
-                    value={user.email}
-                    disabled
-                  />
-                </label>
-
+                <button type="button" className="accountButton" onClick={saveName} disabled={nameBusy || name.trim() === user.name}>
+                  {nameBusy ? "Salvando..." : "Salvar"}
+                </button>
               </div>
 
-              <div className="profileCard profileHighlight">
-                <span className="eyebrow">
-                  Sua jornada
-                </span>
+              <label>
+                E-mail
+                <input value={user.email} disabled />
+              </label>
+            </article>
 
-                <h2>
-                  Tudo organizado em um só lugar.
-                </h2>
-
-                <p>
-                  Favorite instituições na página de
-                  busca, compare suas opções e mantenha
-                  seus documentos organizados.
-                </p>
-
-                <div className="miniStats">
-                  <div>
-                    <b>{liked.length}</b>
-                    <span>favoritas</span>
-                  </div>
-
-                  <div>
-                    <b>{docs.length}</b>
-                    <span>documentos</span>
-                  </div>
-
-                  <div>
-                    <b>4</b>
-                    <span>máx. no comparador</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {section === "favoritos" && (
-            <div className="profileCard fullCard">
-              <div className="sectionHead">
-                <div>
-                  <span className="eyebrow">
-                    Sua coleção
-                  </span>
-
-                  <h2>
-                    Instituições favoritas
-                  </h2>
-
-                  <p>
-                    As instituições que você favoritou
-                    na página Instituições aparecem
-                    automaticamente aqui.
-                  </p>
-                </div>
-
-                <Link
-                  href="/instituicoes"
-                  className="outline"
-                >
-                  Adicionar mais
+            <aside className="accountCard accountSummary">
+              <header>
+                <span className="accountCardIcon"><Icon n="compare" s={21} /></span>
+                <div><h2>Sua jornada</h2><p>Atalhos para continuar de onde parou.</p></div>
+              </header>
+              <div className="accountActions">
+                <button type="button" className="accountAction" onClick={() => setSection("favoritos")}>
+                  <Icon n="heart" s={21} />
+                  <span><b>{liked.length} {liked.length === 1 ? "favorita" : "favoritas"}</b><small>Instituições que você guardou.</small></span>
+                </button>
+                <button type="button" className="accountAction" onClick={() => setSection("documentos")}>
+                  <Icon n="file" s={21} />
+                  <span><b>{docs.length} {docs.length === 1 ? "documento" : "documentos"}</b><small>Guardados de forma privada.</small></span>
+                </button>
+                <Link href="/comparar" className="accountAction">
+                  <Icon n="compare" s={21} />
+                  <span><b>Comparador</b><small>{comparing ? `${comparing} de 4 instituições selecionadas.` : "Compare até quatro instituições."}</small></span>
                 </Link>
               </div>
+            </aside>
+          </div>
+        )}
 
-              {liked.length ? (
-                <div className="favoriteGrid">
-                  {liked.map((i) => (
-                    <article key={i.id}>
-                      <img
-                        src={i.image}
-                        alt=""
-                      />
+        {section === "favoritos" && (
+          <article className="accountCard">
+            <header>
+              <span className="accountCardIcon"><Icon n="heart" s={21} /></span>
+              <div><h2>Instituições favoritas</h2><p>As instituições que você marcou com o coração.</p></div>
+              <Link href="/instituicoes" className="accountButton ghost"><Icon n="plus" s={17} /> Adicionar</Link>
+            </header>
 
+            {liked.length ? (
+              <div className="accountFavorites">
+                {liked.map((i) => (
+                  <article key={i.id}>
+                    <InstitutionImage i={i} sizes="(max-width: 600px) 92vw, 300px" />
+                    <div>
+                      <b>{i.name}</b>
+                      <span><Icon n="pin" s={15} /> {i.city}, {i.state}</span>
+                    </div>
+                    <button type="button" onClick={() => onLike(i.id)} aria-label={`Remover ${i.name} dos favoritos`} title="Remover dos favoritos">
+                      <Icon n="heart" s={19} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="accountEmpty">
+                <Icon n="heart" s={34} />
+                <b>Nenhuma favorita ainda</b>
+                <p>Vá até <Link href="/instituicoes">Instituições</Link> e toque no coração para guardar uma opção aqui.</p>
+              </div>
+            )}
+          </article>
+        )}
+
+        {section === "documentos" && (
+          <div className="accountGrid">
+            <article className="accountCard">
+              <header>
+                <span className="accountCardIcon"><Icon n="upload" s={21} /></span>
+                <div><h2>{editingDoc ? "Editar documento" : "Adicionar documento"}</h2><p>Informe o nome e envie uma foto.</p></div>
+              </header>
+
+              <label>
+                Nome do documento
+                <input value={docName} maxLength={120} onChange={guard("text", setDocName)} placeholder="Ex.: Documento de identidade" />
+              </label>
+
+              <label className="accountDrop">
+                <Icon n="upload" s={28} />
+                <b>{docFile ? docFile.name : editingDoc ? "Trocar foto do documento" : "Selecionar foto"}</b>
+                <span>JPG, PNG ou WEBP · até 10 MB</span>
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => e.target.files?.[0] && chooseDocFile(e.target.files[0])} />
+              </label>
+
+              <label className="legalCheck accountConsent">
+                <input type="checkbox" checked={docConsent} onChange={(e) => setDocConsent(e.target.checked)} />
+                <span>
+                  Autorizo o Matriculou a guardar este documento de forma privada, apenas para minha organização.
+                  Posso apagá-lo quando quiser. Saiba mais na <Link href="/privacidade">Política de Privacidade</Link>.
+                </span>
+              </label>
+
+              <div className="accountFormActions">
+                <button className="accountButton" type="button" onClick={saveDoc} disabled={docBusy}>
+                  <Icon n="check" s={17} />
+                  {docBusy ? "Salvando..." : editingDoc ? "Salvar edição" : "Adicionar documento"}
+                </button>
+                {editingDoc && (
+                  <button className="accountButton ghost" type="button" onClick={resetDocForm}>Cancelar</button>
+                )}
+              </div>
+            </article>
+
+            <article className="accountCard">
+              <header>
+                <span className="accountCardIcon"><Icon n="file" s={21} /></span>
+                <div><h2>Seus documentos</h2><p>Privados. Os links de abertura expiram em 1 hora.</p></div>
+              </header>
+
+              {docs.length ? (
+                <ul className="accountDocs">
+                  {docs.map((d) => (
+                    <li key={d.id}>
+                      <span className="accountDocIcon"><Icon n="file" s={19} /></span>
                       <div>
-                        <b>{i.name}</b>
-
-                        <span>
-                          {i.city}, {i.state}
-                        </span>
-
-                        <button
-                          onClick={() =>
-                            onLike(i.id)
-                          }
-                        >
-                          Remover favorito
-                        </button>
+                        {d.url ? (
+                          <a href={d.url} target="_blank" rel="noopener noreferrer">{d.nome}</a>
+                        ) : (
+                          <b>{d.nome}</b>
+                        )}
+                        <small>Enviado em {new Date(d.created_at).toLocaleDateString("pt-BR")}</small>
                       </div>
-                    </article>
+                      <button type="button" onClick={() => editDoc(d)} aria-label={`Editar ${d.nome}`} title="Editar"><Icon n="edit" s={17} /></button>
+                      <button type="button" className="danger" onClick={() => deleteDoc(d)} aria-label={`Apagar ${d.nome}`} title="Apagar"><Icon n="trash" s={17} /></button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               ) : (
-                <div className="emptySmall">
-                  Você ainda não favoritou nenhuma
-                  instituição. Vá até{" "}
-                  <Link href="/instituicoes">
-                    Instituições
-                  </Link>{" "}
-                  e toque no coração.
+                <div className="accountEmpty">
+                  <Icon n="file" s={34} />
+                  <b>Nenhum documento enviado</b>
+                  <p>Os documentos que você adicionar aparecem aqui.</p>
                 </div>
               )}
+            </article>
+          </div>
+        )}
+
+        {section === "privacidade" && (
+          <article className="accountCard accountNarrow">
+            <header>
+              <span className="accountCardIcon"><Icon n="shield" s={21} /></span>
+              <div><h2>Privacidade e LGPD</h2><p>Seus dados, sob o seu controle.</p></div>
+            </header>
+
+            <div className="accountActions">
+              <button type="button" className="accountAction" onClick={exportData}>
+                <Icon n="download" s={21} />
+                <span><b>Baixar meus dados</b><small>Cópia do cadastro, favoritos e documentos.</small></span>
+              </button>
+              <Link href="/lgpd" className="accountAction">
+                <Icon n="mail" s={21} />
+                <span><b>Outras solicitações</b><small>Correção, informação ou revogação de consentimento.</small></span>
+              </Link>
+              <Link href="/privacidade" className="accountAction">
+                <Icon n="book" s={21} />
+                <span><b>Política de Privacidade</b><small>Como tratamos e protegemos seus dados.</small></span>
+              </Link>
             </div>
-          )}
 
-          {section === "documentos" && (
-            <div className="profileGrid">
-              <div className="profileCard">
-                <span className="eyebrow">
-                  Organização
-                </span>
-
-                <h2>
-                  {editingDoc ? "Editar documento" : "Adicionar documento"}
-                </h2>
-
-                <p>
-                  Informe o nome e envie uma foto para manter seus documentos
-                  sempre à mão.
-                </p>
-
-                <label className="documentNameField">
-                  Nome do documento
-
-                  <input
-                    value={docName}
-                    onChange={(e) => setDocName(e.target.value)}
-                    placeholder="Ex.: Documento de identidade"
-                  />
-                </label>
-
-                <label className="dropzone">
-                  <Icon n="upload" s={32} />
-
-                  <b>
-                    {docFile
-                      ? docFile.name
-                      : editingDoc
-                      ? "Trocar foto do documento"
-                      : "Selecionar foto"}
-                  </b>
-
-                  <span>
-                    JPG, JPEG, PNG ou WEBP
-                  </span>
-
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(e) =>
-                      e.target.files?.[0] &&
-                      chooseDocFile(
-                        e.target.files[0]
-                      )
-                    }
-                  />
-                </label>
-
-                <div className="documentFormActions">
-                  <button
-                    className="button"
-                    type="button"
-                    onClick={saveDoc}
-                    disabled={docBusy}
-                  >
-                    {docBusy
-                      ? "Salvando..."
-                      : editingDoc
-                      ? "Salvar edição"
-                      : "Adicionar documento"}
-                    <Icon n="check" />
-                  </button>
-
-                  {editingDoc && (
-                    <button
-                      className="outline"
-                      type="button"
-                      onClick={resetDocForm}
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
+            <div className="accountDanger">
+              <div>
+                <b>Excluir minha conta</b>
+                <small>Apaga cadastro, favoritos, foto e documentos de forma definitiva.</small>
               </div>
-
-              <div className="profileCard">
-                <span className="eyebrow">
-                  Documentos enviados
-                </span>
-
-                <h2>Seus documentos</h2>
-
-                <div className="docList">
-                  {docs.length ? (
-                    docs.map((d) => (
-                      <div key={d.id}>
-                        <Icon n="file" />
-
-                        {d.url ? (
-                          <a
-                            className="docName"
-                            href={d.url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {d.nome}
-                          </a>
-                        ) : (
-                          <span className="docName">{d.nome}</span>
-                        )}
-
-                        <div className="docActions">
-                          <button
-                            type="button"
-                            onClick={() => editDoc(d)}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteDoc(d)}
-                          >
-                            Apagar
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="emptySmall">
-                      Nenhum documento enviado ainda.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <button type="button" className="accountButton danger" onClick={deleteAccount} disabled={deleting}>
+                <Icon n="trash" s={17} /> {deleting ? "Excluindo..." : "Excluir conta"}
+              </button>
             </div>
-          )}
-        </section>
-      </div>
+          </article>
+        )}
+      </section>
     </main>
   );
 }
@@ -1950,6 +2045,8 @@ function Auth({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async (
@@ -1958,22 +2055,25 @@ function Auth({
     e.preventDefault();
 
     if (!isSupabaseConfigured) { showToast("Login indisponível nesta demonstração. Explore os cursos e o comparador livremente."); return; }
+    if (register && (!acceptTerms || !ageConfirmed)) { showToast("Confirme os termos e a declaração de idade para continuar."); return; }
     setBusy(true);
 
     if (register) {
       const { data, error } =
         await supabase.auth.signUp({
-          email,
+          email: clean(email),
           password,
           options: {
             data: {
-              nome_completo: name,
+              nome_completo: clean(name),
+              termos_versao: legal.version,
+              termos_aceitos_em: new Date().toISOString(),
             },
           },
         });
 
       if (error) {
-        showToast(error.message);
+        showToast(authError(error.message));
         setBusy(false);
         return;
       }
@@ -1998,17 +2098,9 @@ function Auth({
         id: data.user.id,
         email:
           data.user.email || email,
-        name: name || "Usuário",
+        name: clean(name) || "Usuário",
         avatar_url: null,
       };
-
-      await supabase
-        .from("usuarios")
-        .upsert({
-          id: u.id,
-          email: u.email,
-          nome_completo: u.name,
-        });
 
       onDone(u);
 
@@ -2017,14 +2109,16 @@ function Auth({
       const { data, error } =
         await supabase.auth.signInWithPassword(
           {
-            email,
+            email: clean(email),
             password,
           }
         );
 
       if (error) {
         showToast(
-          "E-mail ou senha inválidos."
+          /confirm/i.test(error.message)
+            ? "Confirme seu e-mail antes de entrar."
+            : "E-mail ou senha inválidos."
         );
         setBusy(false);
         return;
@@ -2060,7 +2154,7 @@ function Auth({
   };
 
   return (
-    <main className="authPage">
+    <main className="authPage" id="conteudo">
       <div className="authArt">
         <MatriculouLogo />
 
@@ -2069,11 +2163,11 @@ function Auth({
             Uma experiência criada pela BIJK
           </span>
 
-          <h1>
+          <p className="authArtTitle">
             {register
               ? "Seu próximo capítulo começa com uma escolha."
               : "Tudo que importa para sua próxima escolha, em um só lugar."}
-          </h1>
+          </p>
 
           <p>
             Uma experiência mais organizada para
@@ -2119,12 +2213,11 @@ function Auth({
 
               <input
                 required
+                minLength={2}
+                maxLength={120}
+                autoComplete="name"
                 value={name}
-                onChange={(e) =>
-                  setName(
-                    e.target.value
-                  )
-                }
+                onChange={guard("name", setName)}
                 placeholder="Como podemos te chamar?"
               />
             </label>
@@ -2136,12 +2229,10 @@ function Auth({
             <input
               required
               type="email"
+              maxLength={160}
+              autoComplete="email"
               value={email}
-              onChange={(e) =>
-                setEmail(
-                  e.target.value
-                )
-              }
+              onChange={guard("email", setEmail)}
               placeholder="voce@email.com"
             />
           </label>
@@ -2151,21 +2242,40 @@ function Auth({
 
             <input
               required
-              minLength={6}
+              minLength={register ? 8 : 6}
               type="password"
+              autoComplete={register ? "new-password" : "current-password"}
               value={password}
               onChange={(e) =>
                 setPassword(
                   e.target.value
                 )
               }
-              placeholder="Mínimo de 6 caracteres"
+              placeholder={register ? "Mínimo de 8 caracteres" : "Sua senha"}
             />
           </label>
 
+          {register && (
+            <>
+              <label className="legalCheck">
+                <input type="checkbox" required checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
+                <span>
+                  Li e aceito os <Link href="/termos-de-uso" target="_blank">Termos de Uso</Link>, os{" "}
+                  <Link href="/termos-de-servico" target="_blank">Termos de Serviço</Link> e a{" "}
+                  <Link href="/privacidade" target="_blank">Política de Privacidade</Link>.
+                </span>
+              </label>
+              <label className="legalCheck">
+                <input type="checkbox" required checked={ageConfirmed} onChange={(e) => setAgeConfirmed(e.target.checked)} />
+                <span>Tenho 18 anos ou mais, ou tenho autorização do meu responsável legal para criar esta conta.</span>
+              </label>
+            </>
+          )}
+
           <button
             className="button full"
-            disabled={busy}
+            disabled={busy || (register && (!acceptTerms || !ageConfirmed))}
+            title={register && (!acceptTerms || !ageConfirmed) ? "Aceite os termos para continuar" : undefined}
           >
             {busy
               ? "Aguarde..."
@@ -2204,7 +2314,7 @@ function SimplePage({
 }) {
   if (kind === "como") {
     return (
-      <main className="simplePage">
+      <main className="simplePage" id="conteudo">
         <div className="simpleHero">
           <span className="eyebrow">
             Como funciona
@@ -2229,7 +2339,7 @@ function SimplePage({
   }
 
   return (
-    <main className="simplePage aboutPage">
+    <main className="simplePage aboutPage" id="conteudo">
       <div className="aboutIntro">
         <div>
           <span className="eyebrow">
@@ -2255,6 +2365,8 @@ function SimplePage({
           <img
             src="/images/bijk-logo.png"
             alt="BIJK"
+            width={320}
+            height={320}
           />
 
           <span>
@@ -2326,7 +2438,7 @@ function Footer() {
   return (
     <footer>
       <div>
-        <Link href="/" className="footerBrand"><img src="/images/matriculou-logo-white.png" alt="Matriculou" /></Link>
+        <Link href="/" className="footerBrand"><img src="/images/matriculou-logo-white.png" alt="Matriculou" width={162} height={55} /></Link>
 
         <p>
           Matriculou é uma experiência educacional
@@ -2366,6 +2478,25 @@ function Footer() {
         <Link href="/cadastro">
           Criar conta
         </Link>
+      </div>
+
+      <div>
+        <b>Legal</b>
+
+        {legalLinks.map((link) => (
+          <Link key={link.href} href={link.href}>
+            {link.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="footerLegal">
+        <span>
+          © {new Date().getFullYear()} {legal.controller}
+          {legal.document ? ` · ${legal.document}` : ""}. O Matriculou não realiza matrículas e não tem vínculo com as instituições listadas.
+        </span>
+        <button type="button" className="footerConsent" onClick={openConsentPreferences}>Preferências de cookies</button>
+        {legal.email && <a href={`mailto:${legal.email}`}>{legal.email}</a>}
       </div>
     </footer>
   );
@@ -2482,14 +2613,12 @@ export default function MatriculouApp({
                 0,
               scholarships:
                 x.possui_bolsas,
-              rating:
-                x.avaliacao_media,
-              reviews:
-                x.total_avaliacoes,
               image:
-                x.foto_capa,
-              vacancy:
-                x.status_vaga,
+                x.foto_capa || null,
+              imageCredit:
+                x.foto_capa && x.foto_autor
+                  ? { author: x.foto_autor, license: x.foto_licenca || "", source: x.foto_fonte || "" }
+                  : null,
             })
           )
         );
@@ -2736,25 +2865,19 @@ export default function MatriculouApp({
               liked.includes(i.id)
           )}
           onLike={toggleLike}
+          onLogout={logout}
           showToast={show}
         />
       ) : (
-        <main className="lockedPage">
-          <h1>
-            Seu perfil aparece depois do login.
-          </h1>
-
-          <p>
-            Entre para acessar favoritas,
-            documentos e sua jornada organizada.
-          </p>
-
-          <Link
-            href="/login"
-            className="button"
-          >
-            Entrar
-          </Link>
+        <main className="accountPage accountLocked" id="conteudo">
+          <span className="accountCardIcon"><Icon n="user" s={30} /></span>
+          <span className="eyebrow">Meu perfil</span>
+          <h1>Seu perfil aparece depois do login.</h1>
+          <p>Entre para acessar favoritas, documentos e sua jornada organizada.</p>
+          <div className="accountFormActions">
+            <Link href="/login" className="accountButton">Entrar <Icon n="arrow" s={18} /></Link>
+            <Link href="/cadastro" className="accountButton ghost">Criar conta</Link>
+          </div>
         </main>
       );
       break;
@@ -2785,6 +2908,14 @@ export default function MatriculouApp({
       );
       break;
 
+    case "privacidade":
+    case "termos-uso":
+    case "termos-servico":
+    case "cookies":
+    case "lgpd":
+      content = <LegalPage key={user?.id || "visitante"} view={view} user={user} />;
+      break;
+
     default:
       content = (
         <SimplePage kind="sobre" />
@@ -2795,6 +2926,7 @@ export default function MatriculouApp({
     <>
       <NavBar
         user={user}
+        menuOpen={menu}
         activeView={view}
         onMenu={() =>
           setMenu(true)
@@ -2816,23 +2948,11 @@ export default function MatriculouApp({
       <div className={`pageTransition view-${view}`} key={view}>
         <div className="screenGlow screenGlowOne" />
         <div className="screenGlow screenGlowTwo" />
-        {catalogStatus === "demo" && ["instituicoes", "comparar"].includes(view) && <p className="catalogNotice" role="status">Modo demonstração · instituições, avaliações e valores fictícios para explorar a experiência.</p>}
-        {catalogStatus === "error" && <p className="catalogNotice" role="status">Não foi possível carregar o catálogo. Tente novamente em instantes. Os cursos continuam disponíveis.</p>}
+        {catalogStatus === "demo" && ["instituicoes", "comparar"].includes(view) && <p className="catalogNotice" role="status">Modo demonstração · instituições e valores fictícios para explorar a experiência.</p>}
+        {catalogStatus === "error" && !legalViews.includes(view) && <p className="catalogNotice" role="status">Não foi possível carregar o catálogo. Tente novamente em instantes. Os cursos continuam disponíveis.</p>}
         {content}
-        {!["home", "login", "cadastro"].includes(view) && <NextChapter view={view}/>}
+        {!["home", "login", "cadastro", "perfil", ...legalViews].includes(view) && <NextChapter view={view}/>}
       </div>
-
-      {view === "perfil" &&
-        user && (
-          <div className="logoutFloat">
-            <button
-              className="outline"
-              onClick={logout}
-            >
-              <Icon n="logout" /> Sair da conta
-            </button>
-          </div>
-        )}
 
       {!["login", "cadastro"].includes(
         view

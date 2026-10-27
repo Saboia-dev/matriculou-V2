@@ -20,9 +20,9 @@ export default function CinemaPortal() {
   });
 
   return <section ref={ref} className={`cinemaPortal ${motion ? "isMotion" : ""}`} aria-label="Um novo horizonte">
-    <div className="cinemaPortalViewport"><div className="cinemaPortalFrame"><div className="cinemaPortalPhoto"><Image src="/images/cinema/campus.jpg" alt="Estudantes comemoram uma nova etapa de suas histórias" fill sizes="100vw" /></div><div className="cinemaPortalShade" /><span className="cinemaPortalOutline" aria-hidden="true">POSSIBILIDADES</span></div>
+    <div className="cinemaPortalViewport"><div className="cinemaPortalFrame"><div className="cinemaPortalPhoto"><Image src="/images/cinema/campus.jpg" alt="Formandos de beca jogam os capelos para o alto em uma formatura ao ar livre" fill sizes="100vw" /></div><div className="cinemaPortalShade" /><span className="cinemaPortalOutline" aria-hidden="true">POSSIBILIDADES</span></div>
       <div className="cinemaPortalCopy"><span className="filmSectionLabel"><i />O HORIZONTE SE ABRE</span><h2>Você ainda tem<br /><em>muito para viver.</em></h2><p>Novos lugares. Novas ideias. Uma história que só você pode escrever.</p><Link href="/instituicoes" className="filmTextLink">Encontre seu próximo capítulo<CinemaIcon name="diagonal" size={20} /></Link></div>
-      <div className="cinemaPortalBottom"><span>IMAGINE O QUE VEM DEPOIS</span><div className="cinemaPortalProgress"><i /></div><CinemaIcon name="spark" size={23} /></div>
+      <div className="cinemaPortalBottom"><span>IMAGINE O QUE VEM DEPOIS</span><div className="cinemaPortalProgress"><i /></div><CinemaIcon name="down" size={23} /></div>
     </div>
   </section>;
 }

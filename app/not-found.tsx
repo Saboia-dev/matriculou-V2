@@ -6,7 +6,7 @@ export default function NotFound() {
   return <>
     <header className="nav"><div className="navInner"><Link href="/" className="matriculouLogo"><img src="/images/matriculou-logo-white.png" alt="Matriculou"/></Link><nav className="missingNav" aria-label="Navegação principal"><Link href="/instituicoes">Instituições</Link><Link href="/cursos">Cursos</Link></nav><Link className="missingHome" href="/">Voltar ao início <CinemaIcon name="diagonal" size={17}/></Link></div></header>
     <main className="missingPage" id="conteudo">
-      <Image src="/images/cinema/library.jpg" alt="" fill sizes="100vw" priority className="missingBackground"/>
+      <Image src="/images/cinema/library.jpg" alt="Corredor de biblioteca com estantes cheias de livros" fill sizes="100vw" priority className="missingBackground"/>
       <div className="missingContent"><span className="filmSectionLabel"><i/>FORA DO MAPA. DENTRO DAS POSSIBILIDADES.</span>
         <div className="missingCode" aria-label="Erro 404"><span>4</span><div className="missingOrbit" aria-hidden="true"><i/><i/><i/><b>?</b></div><span>4</span></div>
         <h1>Esse caminho<br/><em>ainda não existe.</em></h1><p>A página pode ter mudado de endereço.<br/>Seu próximo capítulo continua esperando por você.</p>

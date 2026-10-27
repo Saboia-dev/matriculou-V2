@@ -193,3 +193,9 @@ html[data-cinema="off"] .scrollStoryVisual,html[data-cinema-quality="lite"] .scr
 html[data-cinema="off"] .scrollStoryChapter h3 { translate: none; }
 html[data-cinema="off"] .cinemaPortalFrame { clip-path: none; }
 @media(prefers-reduced-motion:reduce) { .scrollStoryVisual { position: relative; top: auto; } .scrollStoryVisualWord { animation: none; } }
+
+/* Scroll reveal (see CinemaProvider): a translate-only rise, so text is never faded or unreadable. Uses `translate`, not `transform`, so it never
+   fights the card tilt; without motion every element is simply visible. */
+html[data-cinema=on] [data-reveal=pending] { translate: 0 45px; }
+html[data-cinema=on][data-cinema-quality=lite] [data-reveal=pending] { translate: 0 18px; }
+html[data-cinema=on] [data-reveal=in] { translate: 0 0; transition: translate .95s cubic-bezier(.25,1,.5,1) var(--reveal-delay, 0s); }
