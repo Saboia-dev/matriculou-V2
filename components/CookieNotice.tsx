@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CONSENT_EVENT, OPEN_PREFERENCES_EVENT, gatedScripts, readConsent, saveConsent, type Consent, type ConsentCategory } from "../lib/consent";
+import {
+  CONSENT_EVENT,
+  OPEN_PREFERENCES_EVENT,
+  gatedScripts,
+  readConsent,
+  saveConsent,
+  type Consent,
+  type ConsentCategory,
+} from "../lib/consent";
 
 // Third-party scripts only reach the page after their category is allowed. Revoking a category
 // removes the tag and reloads, since a script that already ran cannot be undone in place.
@@ -35,10 +43,26 @@ function applyConsent(consent: Consent | null) {
   if (revoked) location.reload();
 }
 
-const categories: { id: "essential" | ConsentCategory; title: string; text: string }[] = [
-  { id: "essential", title: "Essenciais", text: "Mantêm o comparador, a conversa com a Mia e suas escolhas de privacidade. Sempre ativos." },
-  { id: "analytics", title: "Analíticos", text: "Medem, de forma anônima, quais páginas são mais úteis." },
-  { id: "marketing", title: "Marketing", text: "Permitiriam anúncios personalizados. Hoje não usamos nenhum." },
+const categories: {
+  id: "essential" | ConsentCategory;
+  title: string;
+  text: string;
+}[] = [
+  {
+    id: "essential",
+    title: "Essenciais",
+    text: "Mantêm o comparador, a conversa com a Mia e suas escolhas de privacidade. Sempre ativos.",
+  },
+  {
+    id: "analytics",
+    title: "Analíticos",
+    text: "Medem, de forma anônima, quais páginas são mais úteis.",
+  },
+  {
+    id: "marketing",
+    title: "Marketing",
+    text: "Permitiriam anúncios personalizados. Hoje não usamos nenhum.",
+  },
 ];
 
 export default function CookieNotice() {
@@ -50,15 +74,21 @@ export default function CookieNotice() {
   useEffect(() => {
     const stored = readConsent();
     applyConsent(stored);
-    if (stored) setChoice({ analytics: stored.analytics, marketing: stored.marketing });
+    if (stored)
+      setChoice({ analytics: stored.analytics, marketing: stored.marketing });
     else setOpen(true);
     const reopen = () => {
       const current = readConsent();
-      if (current) setChoice({ analytics: current.analytics, marketing: current.marketing });
+      if (current)
+        setChoice({
+          analytics: current.analytics,
+          marketing: current.marketing,
+        });
       setManaging(true);
       setOpen(true);
     };
-    const changed = (e: Event) => applyConsent((e as CustomEvent<Consent>).detail);
+    const changed = (e: Event) =>
+      applyConsent((e as CustomEvent<Consent>).detail);
     addEventListener(OPEN_PREFERENCES_EVENT, reopen);
     addEventListener(CONSENT_EVENT, changed);
     return () => {
@@ -68,7 +98,10 @@ export default function CookieNotice() {
   }, []);
 
   useEffect(() => {
-    if (managing) panel.current?.querySelector<HTMLElement>("input:not(:disabled)")?.focus();
+    if (managing)
+      panel.current
+        ?.querySelector<HTMLElement>("input:not(:disabled)")
+        ?.focus();
   }, [managing]);
 
   if (!open) return null;
@@ -81,11 +114,18 @@ export default function CookieNotice() {
   };
 
   return (
-    <aside ref={panel} className={`consentBanner ${managing ? "isManaging" : ""}`} role="region" aria-label="Preferências de cookies">
+    <aside
+      ref={panel}
+      className={`consentBanner ${managing ? "isManaging" : ""}`}
+      role="region"
+      aria-label="Preferências de cookies"
+    >
       <div className="consentCopy">
         <h2>Sua privacidade</h2>
         <p>
-          Usamos apenas o armazenamento essencial para o site funcionar. Outras categorias só são ativadas com a sua permissão. <Link href="/cookies">Política de Cookies</Link>
+          Usamos apenas o armazenamento essencial para o site funcionar. Outras
+          categorias só são ativadas com a sua permissão.{" "}
+          <Link href="/cookies">Política de Cookies</Link>
         </p>
       </div>
 
@@ -94,7 +134,9 @@ export default function CookieNotice() {
           <legend className="srOnly">Categorias de cookies</legend>
           {categories.map((item) => {
             const essential = item.id === "essential";
-            const checked = essential ? true : choice[item.id as ConsentCategory];
+            const checked = essential
+              ? true
+              : choice[item.id as ConsentCategory];
             return (
               <label key={item.id} className="consentOption">
                 <span>
@@ -108,7 +150,12 @@ export default function CookieNotice() {
                   checked={checked}
                   disabled={essential}
                   aria-checked={checked}
-                  onChange={(e) => setChoice((current) => ({ ...current, [item.id]: e.target.checked }))}
+                  onChange={(e) =>
+                    setChoice((current) => ({
+                      ...current,
+                      [item.id]: e.target.checked,
+                    }))
+                  }
                 />
               </label>
             );
@@ -118,12 +165,37 @@ export default function CookieNotice() {
 
       <div className="consentActions">
         {managing ? (
-          <button type="button" className="consentButton primary" onClick={() => decide(choice)}>Salvar preferências</button>
+          <button
+            type="button"
+            className="consentButton primary"
+            onClick={() => decide(choice)}
+          >
+            Salvar preferências
+          </button>
         ) : (
-          <button type="button" className="consentButton ghost" onClick={() => setManaging(true)} aria-expanded={false}>Gerenciar preferências</button>
+          <button
+            type="button"
+            className="consentButton ghost"
+            onClick={() => setManaging(true)}
+            aria-expanded={false}
+          >
+            Gerenciar preferências
+          </button>
         )}
-        <button type="button" className="consentButton" onClick={() => decide({ analytics: false, marketing: false })}>Rejeitar</button>
-        <button type="button" className="consentButton primary" onClick={() => decide({ analytics: true, marketing: true })}>Aceitar todos</button>
+        <button
+          type="button"
+          className="consentButton"
+          onClick={() => decide({ analytics: false, marketing: false })}
+        >
+          Rejeitar
+        </button>
+        <button
+          type="button"
+          className="consentButton primary"
+          onClick={() => decide({ analytics: true, marketing: true })}
+        >
+          Aceitar todos
+        </button>
       </div>
     </aside>
   );

@@ -1,5 +1,12 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import { HowItWorksPage } from "../../components/pages/InfoPages";
 
-export const metadata: Metadata = { title: 'Como funciona', description: 'Como pesquisar, entender, comparar e organizar sua escolha no Matriculou.' };
-export default function Page(){return <MatriculouApp view="como"/>}
+export const metadata: Metadata = {
+  title: "Como funciona",
+  description:
+    "Pesquise, entenda os cursos, compare com inteligência e candidate-se.",
+};
+
+export default function Page() {
+  return <HowItWorksPage />;
+}

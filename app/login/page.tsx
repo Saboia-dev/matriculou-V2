@@ -1,5 +1,13 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import AuthPage from "../../components/auth/AuthPage";
 
-export const metadata: Metadata = { title: 'Entrar', description: 'Acesse sua conta no Matriculou.', robots: { index: false } };
-export default function Page(){return <MatriculouApp view="login"/>}
+export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
+
+export default function Page() {
+  return (
+    <Suspense>
+      <AuthPage mode="login" />
+    </Suspense>
+  );
+}

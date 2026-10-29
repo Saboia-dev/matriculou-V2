@@ -1,7 +1,14 @@
-import type { MetadataRoute } from 'next';
+import type { MetadataRoute } from "next";
 
-const site = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const site = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export default function robots(): MetadataRoute.Robots {
-  return { rules: { userAgent: '*', allow: '/', disallow: ['/perfil', '/login'] }, sitemap: `${site}/sitemap.xml` };
+  return {
+    rules: {
+      userAgent: "*",
+      allow: "/",
+      disallow: ["/perfil", "/login", "/admin", "/redefinir-senha"],
+    },
+    sitemap: `${site}/sitemap.xml`,
+  };
 }

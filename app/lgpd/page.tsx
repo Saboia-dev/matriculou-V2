@@ -1,5 +1,12 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import LegalPage from "../../components/LegalPages";
 
-export const metadata: Metadata = { title: 'Seus direitos (LGPD)', description: 'Formulário para exercer seus direitos de titular de dados pessoais.' };
-export default function Page(){return <MatriculouApp view="lgpd"/>}
+export const metadata: Metadata = {
+  title: "Seus direitos (LGPD)",
+  description:
+    "Exerça os direitos previstos na Lei Geral de Proteção de Dados.",
+};
+
+export default function Page() {
+  return <LegalPage view="lgpd" />;
+}

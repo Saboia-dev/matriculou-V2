@@ -1,5 +1,12 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import { AboutPage } from "../../components/pages/InfoPages";
 
-export const metadata: Metadata = { title: 'Sobre a BIJK', description: 'Conheça a BIJK, a equipe que desenvolve o Matriculou.' };
-export default function Page(){return <MatriculouApp view="sobre"/>}
+export const metadata: Metadata = {
+  title: "Sobre a BIJK",
+  description:
+    "Quem desenvolve o Matriculou e os princípios que guiam o produto.",
+};
+
+export default function Page() {
+  return <AboutPage />;
+}

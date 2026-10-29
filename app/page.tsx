@@ -1,2 +1,5 @@
-import MatriculouApp from '../components/MatriculouApp';
-export default function Page(){return <MatriculouApp view="home"/>}
+import HomePage from "../components/pages/HomePage";
+
+export default function Page() {
+  return <HomePage />;
+}

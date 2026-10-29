@@ -5,8 +5,16 @@ import type { ScrollTrigger as ScrollTriggerType } from "gsap/ScrollTrigger";
 // Every GSAP effect on the site is scroll-driven, so the library is fetched on the first
 // interaction (scroll, touch, pointer, key), or after the page settles if none comes.
 // First paint, LCP and input readiness never pay for animation code.
-let motion: Promise<[typeof import("gsap"), typeof import("gsap/ScrollTrigger")]> | null = null;
-const intents = ["scroll", "wheel", "touchstart", "pointerdown", "keydown"] as const;
+let motion: Promise<
+  [typeof import("gsap"), typeof import("gsap/ScrollTrigger")]
+> | null = null;
+const intents = [
+  "scroll",
+  "wheel",
+  "touchstart",
+  "pointerdown",
+  "keydown",
+] as const;
 
 export function loadMotion() {
   if (!motion) {
@@ -18,9 +26,14 @@ export function loadMotion() {
         intents.forEach((type) => removeEventListener(type, go));
         resolve();
       };
-      intents.forEach((type) => addEventListener(type, go, { once: true, passive: true }));
+      intents.forEach((type) =>
+        addEventListener(type, go, { once: true, passive: true }),
+      );
       // A visitor who only watches still gets the scenes: load once the page has settled.
-      const idle = () => ("requestIdleCallback" in window ? requestIdleCallback(go, { timeout: 2000 }) : go());
+      const idle = () =>
+        "requestIdleCallback" in window
+          ? requestIdleCallback(go, { timeout: 2000 })
+          : go();
       const fallback = () => setTimeout(idle, 3000);
       if (document.readyState === "complete") fallback();
       else addEventListener("load", fallback, { once: true });

@@ -1,5 +1,18 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import ProfilePage from "../../components/account/ProfilePage";
 
-export const metadata: Metadata = { title: 'Meu perfil', description: 'Favoritos, documentos e dados da sua conta.', robots: { index: false } };
-export default function Page(){return <MatriculouApp view="perfil"/>}
+export const metadata: Metadata = {
+  title: "Meu perfil",
+  description:
+    "Favoritas, candidaturas, documentos e configurações da sua conta.",
+  robots: { index: false },
+};
+
+export default function Page() {
+  return (
+    <Suspense>
+      <ProfilePage />
+    </Suspense>
+  );
+}

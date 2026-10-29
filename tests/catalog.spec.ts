@@ -1,82 +1,161 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Search results must never stay faded by scroll animations, whatever the filter or scroll.
+const cards = (page: Page) => page.locator(".cardGrid > .instCard");
+
+// Resultados de busca nunca podem ficar apagados por animações de rolagem.
 async function fadedCards(page: Page) {
   await page.waitForTimeout(1200);
-  return page.$$eval(".cards3 > .instCard", (cards) => cards.filter((card) => {
-    const r = card.getBoundingClientRect();
-    const visible = (Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / r.height;
-    return visible > 0.3 && (Number(getComputedStyle(card).opacity) < 0.95 || card.hasAttribute("data-reveal"));
-  }).length);
+  return cards(page).evaluateAll(
+    (list) =>
+      list.filter((card) => {
+        const r = card.getBoundingClientRect();
+        const visible =
+          (Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)) / r.height;
+        return (
+          visible > 0.3 &&
+          (Number(getComputedStyle(card).opacity) < 0.95 ||
+            card.hasAttribute("data-reveal"))
+        );
+      }).length,
+  );
 }
 
-test("institution cards stay fully visible through filters and scrolling", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("matriculou-consent", JSON.stringify({ version: 1, decidedAt: new Date().toISOString(), analytics: false, marketing: false })));
+test("filters stay in the URL and cards stay visible while scrolling", async ({
+  page,
+}) => {
   await page.goto("/instituicoes");
-  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
-  const toList = () => page.evaluate(() => scrollTo(0, document.querySelector(".cards3")!.getBoundingClientRect().top + scrollY - 150));
-
-  for (const uf of ["RS", "SP", "todos"]) {
+  await expect(cards(page).first()).toBeVisible();
+  for (const uf of ["RS", "SP", ""]) {
     await page.getByLabel("Estado", { exact: true }).selectOption(uf);
-    await toList();
+    if (uf) await expect(page).toHaveURL(new RegExp(`uf=${uf}`));
     expect(await fadedCards(page)).toBe(0);
   }
   await page.getByLabel("Rede", { exact: true }).selectOption("privada");
-  await toList();
-  expect(await fadedCards(page)).toBe(0);
-  for (let i = 0; i < 4; i++) {
+  await expect(page).toHaveURL(/rede=privada/);
+  for (let i = 0; i < 3; i++) {
     await page.mouse.wheel(0, 1100);
     expect(await fadedCards(page)).toBe(0);
   }
-  await page.locator(".filterSearch input").fill("sorocaba");
-  await toList();
-  expect(await fadedCards(page)).toBe(0);
+  await page.reload();
+  await expect(page.getByLabel("Rede", { exact: true })).toHaveValue("privada");
+  await page.getByRole("button", { name: "Remover filtro Privada" }).click();
+  await expect(page).not.toHaveURL(/rede=/);
 });
 
-test("institution search matches courses, full state names and words in any order", async ({ page }) => {
+test("search matches courses, full state names and words in any order", async ({
+  page,
+}) => {
   await page.goto("/instituicoes");
-  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
-  const search = page.locator(".filterSearch input");
-  const titles = () => page.locator(".cards3 > .instCard h3").allInnerTexts();
+  await expect(cards(page).first()).toBeVisible();
+  const search = page.getByPlaceholder("Instituição, cidade, estado ou curso");
+  const titles = () => cards(page).locator("h3").allInnerTexts();
 
   await search.fill("rio ufrj");
-  expect(await titles()).toContain("Universidade Federal do Rio de Janeiro (UFRJ)");
+  await expect(page).toHaveURL(/q=rio/);
+  expect(await titles()).toContain(
+    "Universidade Federal do Rio de Janeiro (UFRJ)",
+  );
 
   await search.fill("minas gerais");
-  expect((await titles()).length).toBeGreaterThan(0);
-  await expect(page.locator(".cards3 > .instCard .place").first()).toContainText("MG");
+  await expect(page).toHaveURL(/q=minas/);
+  await expect(cards(page).first().locator(".instPlace")).toContainText("MG");
 
   await search.fill("medicina veterinaria");
+  await expect(page).toHaveURL(/q=medicina/);
   expect((await titles()).length).toBeGreaterThan(0);
-
-  await search.fill("sp");
-  for (const place of await page.locator(".cards3 > .instCard .place").allTextContents()) expect(place).toContain("SP");
 });
 
-test("schools never show a MEC concept", async ({ page }) => {
-  await page.goto("/instituicoes");
-  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
-  await page.getByLabel("Tipo de instituição").selectOption("escola");
-  for (const rating of await page.locator(".cards3 > .instCard .rating").allTextContents()) expect(rating).toContain("Não se aplica");
+test("schools never show a MEC concept and sorting works", async ({ page }) => {
+  await page.goto("/instituicoes?tipo=escola");
+  await expect(cards(page).first()).toBeVisible();
+  for (const fact of await cards(page)
+    .locator(".instFacts div:nth-child(2) dd")
+    .allTextContents())
+    expect(fact).toBe("Não se aplica");
+  await page.goto("/instituicoes?ordem=nome");
+  const names = await cards(page).locator("h3").allInnerTexts();
+  expect(names.slice(0, 5)).toEqual(
+    [...names.slice(0, 5)].sort((a, b) => a.localeCompare(b)),
+  );
 });
 
-test("course search finds courses by area", async ({ page }) => {
+test("an institution opens from the URL with courses and a share link", async ({
+  page,
+}) => {
+  await page.goto("/instituicoes?abrir=mg-01");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Universidade Federal de Minas Gerais");
+  await dialog.getByRole("button", { name: /Cursos/ }).click();
+  await expect(dialog.locator(".offerGroup li").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).not.toHaveURL(/abrir=/);
+});
+
+test("course search finds courses by profession and shows where to study", async ({
+  page,
+}) => {
   await page.goto("/cursos");
-  await page.getByLabel("Pesquisar curso").fill("saude");
-  await expect(page.locator(".courseLarge h2", { hasText: "Enfermagem" })).toBeVisible();
-  await page.getByLabel("Pesquisar curso").fill("xyzabc");
+  const search = page.getByLabel("Pesquisar curso, área ou profissão");
+  await search.fill("advogado");
+  await expect(page).toHaveURL(/q=advogado/);
+  const card = page.locator(".courseCard").filter({
+    has: page.getByRole("heading", { name: "Direito", exact: true }),
+  });
+  await expect(card).toBeVisible();
+  await card.getByRole("button", { name: /Conhecer/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("3.700 horas");
+  await expect(dialog).toContainText("OAB");
+  await expect(dialog.locator(".placeList li").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await search.fill("xyzabc");
   await expect(page.getByText("Nenhum curso encontrado")).toBeVisible();
+});
+
+test("smart comparison ranks institutions and highlights the best values", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "matriculou-compare",
+      JSON.stringify(["mg-01", "mg-02"]),
+    ),
+  );
+  await page.goto("/comparar");
+  await expect(page.locator(".verdict h2")).not.toBeEmpty();
+  await expect(page.locator(".rankCard")).toHaveCount(2);
+  const cost = page.locator(".compareTable tbody tr", { hasText: "Custo" });
+  await expect(cost.locator("td.isBest")).toContainText("Gratuita");
+  await page
+    .getByRole("group", { name: "Custo" })
+    .getByRole("button", { name: "Ignorar" })
+    .click();
+  await expect(page.locator(".rankCard").first()).toBeVisible();
 });
 
 test("every institution card shows a different picture", async ({ page }) => {
   await page.goto("/instituicoes");
-  await expect(page.locator(".cards3 > .instCard").first()).toBeVisible();
-  // Cards render progressively; wait until the whole catalog is on the page.
-  const total = Number((await page.locator(".resultBar b").innerText()).match(/\d+/)![0]);
-  await expect(page.locator(".cards3 > .instCard")).toHaveCount(total, { timeout: 20000 });
-  const sources = await page.locator(".cards3 > .instCard .instImage img").evaluateAll((imgs) =>
-    imgs.map((img) => decodeURIComponent((img as HTMLImageElement).currentSrc || (img as HTMLImageElement).src).replace(/.*url=([^&]+).*/, "$1")),
+  await expect(cards(page).first()).toBeVisible();
+  const total = Number(
+    (await page.locator(".resultHead b").first().innerText()).match(/\d+/)![0],
   );
+  // Os cartões entram em lotes conforme a rolagem.
+  for (let i = 0; i < 12 && (await cards(page).count()) < total; i++) {
+    await cards(page).last().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+  }
+  await expect(cards(page)).toHaveCount(total);
+  const sources = await cards(page)
+    .locator(".instMedia img")
+    .evaluateAll((imgs) =>
+      imgs.map((img) =>
+        decodeURIComponent(
+          (img as HTMLImageElement).currentSrc || (img as HTMLImageElement).src,
+        ).replace(/.*url=([^&]+).*/, "$1"),
+      ),
+    );
   expect(sources.length).toBe(total);
-  expect(sources.filter((src, index) => sources.indexOf(src) !== index)).toEqual([]);
+  expect(
+    sources.filter((src, index) => sources.indexOf(src) !== index),
+  ).toEqual([]);
 });

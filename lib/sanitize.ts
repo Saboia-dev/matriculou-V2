@@ -5,12 +5,14 @@ import type { ChangeEvent } from "react";
 
 export type FieldKind = "name" | "email" | "text";
 
-const markup = /[<>`{}\\]|javascript:|vbscript:|data:text\/html|\bon[a-z]+\s*=/i;
+const markup =
+  /[<>`{}\\]|javascript:|vbscript:|data:text\/html|\bon[a-z]+\s*=/i;
 const nameChars = new RegExp("^[\\p{L}\\p{M}][\\p{L}\\p{M}' .-]*$", "u");
 
 const messages: Record<FieldKind, string> = {
   name: "Use apenas letras, espaços, apóstrofo e hífen.",
-  email: "Informe um e-mail válido, sem caracteres especiais como < > ou aspas.",
+  email:
+    "Informe um e-mail válido, sem caracteres especiais como < > ou aspas.",
   text: "Remova os caracteres < > ` { } \\ e trechos de código.",
 };
 
@@ -25,8 +27,17 @@ export function fieldError(value: string, kind: FieldKind): string {
 // Removes control characters (keeping line breaks in long text), normalizes accents and
 // collapses repeated spaces, so what is stored matches what the person typed.
 export function clean(value: string, multiline = false): string {
-  const text = value.normalize("NFC").replace(multiline ? /[\u0000-\u0009\u000B-\u001F\u007F]/g : /[\u0000-\u001F\u007F]/g, "");
-  return (multiline ? text.replace(/[^\S\n]+/g, " ") : text.replace(/\s+/g, " ")).trim();
+  const text = value
+    .normalize("NFC")
+    .replace(
+      multiline
+        ? /[\u0000-\u0009\u000B-\u001F\u007F]/g
+        : /[\u0000-\u001F\u007F]/g,
+      "",
+    );
+  return (
+    multiline ? text.replace(/[^\S\n]+/g, " ") : text.replace(/\s+/g, " ")
+  ).trim();
 }
 
 // onChange helper: flags the field natively and hands the raw value back to state.

@@ -1,25 +1,45 @@
-# Matriculou + Supabase + BIJK
+# Matriculou + Supabase
 
-Projeto Next.js do Matriculou conectado ao Supabase.
+## Ordem dos scripts
 
-## Configuração
+Execute no SQL Editor do Supabase, nesta ordem (todos podem ser executados de novo sem efeito colateral):
 
-1. Instale as dependências com `npm install`.
-2. O arquivo `.env.local` já contém a URL e a chave pública do projeto Supabase usado pelo projeto.
-3. No SQL Editor do Supabase, execute `supabase/setup.sql`.
-4. Depois execute `supabase/seed_47_instituicoes.sql` para carregar as 47 instituições e suas ofertas.
-5. Em seguida, execute `supabase/lgpd-conformidade.sql`, `supabase/instituicoes-fotos-e-ampliacao.sql` e, por último, `supabase/correcao-dados-catalogo.sql` (corrige conceitos MEC atribuídos a escolas e nomes de curso duplicados).
+1. `supabase/setup.sql` — tabelas base, RLS e buckets `avatars` e `pre-matriculas`.
+2. `supabase/seed_47_instituicoes.sql` — instituições e ofertas iniciais.
+3. `supabase/lgpd-conformidade.sql` — documentos privados, exclusão de conta e solicitações LGPD.
+4. `supabase/instituicoes-fotos-e-ampliacao.sql` — fotos com licença livre e novas instituições.
+5. `supabase/correcao-dados-catalogo.sql` — correções de conceito MEC e nomes de curso.
+6. `supabase/painel-instituicoes.sql` — painel das instituições: equipes, candidaturas, mensagens em tempo real, comunicados, suporte, auditoria, campos novos do perfil e bucket `instituicoes`.
+7. `supabase/ampliacao-cursos.sql` — amplia os cursos oferecidos por cada instituição.
 
-## Storage
+Sem os passos 6 e 7, o site continua funcionando, mas o painel, as candidaturas e o suporte mostram um aviso pedindo a execução do script.
 
-O `setup.sql` cria os buckets `avatars` e `pre-matriculas` e suas políticas de acesso. Isso corrige o erro de `Bucket not found` no upload de foto de perfil.
+## Primeiro administrador da plataforma
+
+O administrador da plataforma aprova os pedidos de acesso das instituições, responde aos chamados de suporte e cadastra instituições. Depois de criar a conta pelo site:
+
+```sql
+update public.usuarios set papel = 'plataforma' where email = 'voce@exemplo.com';
+```
+
+## Como uma instituição ganha acesso
+
+1. Alguém da instituição cria uma conta e abre `/admin`.
+2. Envia o pedido de acesso (instituição, cargo e mensagem).
+3. Um administrador da plataforma aprova em **Painel › Pedidos de acesso**; a pessoa vira administradora daquela instituição.
+4. Ela adiciona a própria equipe em **Equipe**, como administrador ou editor. Redes de ensino recebem acesso a cada unidade e alternam entre elas no topo do menu do painel.
+
+## Segurança
+
+Toda autorização está no banco, por RLS e gatilhos; o site só reflete o que o banco permite:
+
+- cada pessoa lê e altera apenas os próprios dados;
+- a instituição vê só as candidaturas enviadas a ela e não consegue alterar os dados enviados pelo estudante, apenas o status;
+- nome, localização, rede, tipo e conceito MEC só mudam pela plataforma;
+- ninguém altera o próprio papel;
+- favoritos aparecem para a instituição apenas como contagem;
+- as alterações das equipes ficam registradas em `auditoria`.
 
 ## Login
 
-A sessão está configurada com `persistSession: false`, então o acesso não fica salvo no navegador depois de uma recarga/novo acesso. O usuário precisa entrar novamente.
-
-## Identidade visual
-
-- A logo do **Matriculou** aparece no navbar e nas áreas gerais do site.
-- A logo da **BIJK** aparece somente na página **Sobre a BIJK**.
-- A home usa um carrossel com transição suave entre imagens.
+A sessão fica salva no navegador (`matriculou-sessao`) até a pessoa sair. Os links de confirmação de e-mail e de redefinição de senha voltam para `/login` e `/redefinir-senha`; cadastre essas URLs em **Authentication › URL Configuration** do Supabase.

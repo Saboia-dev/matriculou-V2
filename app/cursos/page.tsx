@@ -1,5 +1,17 @@
-import type { Metadata } from 'next';
-import MatriculouApp from '../../components/MatriculouApp';
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import CoursesPage from "../../components/courses/CoursesPage";
 
-export const metadata: Metadata = { title: 'Cursos', description: 'Conheça duração, disciplinas, carreiras e instituições de cada curso.' };
-export default function Page(){return <MatriculouApp view="cursos"/>}
+export const metadata: Metadata = {
+  title: "Cursos",
+  description:
+    "Duração, carga horária oficial, registro profissional, disciplinas, carreiras e onde estudar cada curso.",
+};
+
+export default function Page() {
+  return (
+    <Suspense>
+      <CoursesPage />
+    </Suspense>
+  );
+}

@@ -15,7 +15,22 @@ export default defineConfig({
     // tests/legal.spec.ts clears it to exercise the banner itself.
     storageState: {
       cookies: [],
-      origins: [{ origin: "http://localhost:3000", localStorage: [{ name: "matriculou-consent", value: JSON.stringify({ version: 1, decidedAt: "2026-01-01T00:00:00.000Z", analytics: false, marketing: false }) }] }],
+      origins: [
+        {
+          origin: "http://localhost:3000",
+          localStorage: [
+            {
+              name: "matriculou-consent",
+              value: JSON.stringify({
+                version: 1,
+                decidedAt: "2026-01-01T00:00:00.000Z",
+                analytics: false,
+                marketing: false,
+              }),
+            },
+          ],
+        },
+      ],
     },
   },
   webServer: {
